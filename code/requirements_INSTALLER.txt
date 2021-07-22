@@ -1,0 +1,10 @@
+jupyter
+nbconvert
+matplotlib
+numpy
+gym
+gym[atari]
+torch
+torchvision
+Pillow
+
