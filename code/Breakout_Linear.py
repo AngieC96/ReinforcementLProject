@@ -184,9 +184,9 @@ class EnvManager():
 
     def __init__(self, device):
         self.device = device
-        self.env = gym.make('Breakout-v0').unwrapped
+        #self.env = gym.make('Breakout-v0').unwrapped
         #self.env = gym.make('BreakoutDeterministic-v4').unwrapped
-        #self.env = gym.make('BreakoutNoFrameskip-v4').unwrapped
+        self.env = gym.make('BreakoutNoFrameskip-v4').unwrapped
         self.env.reset() # to have an initial observation of the env
         self.current_screen = None
         self.done = False
@@ -247,7 +247,7 @@ class EnvManager():
         # Strip off top and bottom
         top = int(screen_height * 0.25)
         bottom = int(screen_height)
-        screen = screen[:, top:bottom, :] # strips off the top 40% of the original screen and the bottom 20%
+        screen = screen[:, top:bottom, :] # strips off the top 40% of the original screen
         return screen
 
     def transform_screen_data(self, screen):       
@@ -529,17 +529,17 @@ for episode in range(num_episodes):
         target_net.load_state_dict(policy_net.state_dict())
         save_checkpoint(policy_net, optimizer, num_episodes)
 
-save_weights(policy_net, "Linear_01")
+save_weights(policy_net, "Linear_02")
 em.close()
 
 
 # Let's play an episodes to see if it learned to play:
 
-# In[28]:
+# In[24]:
 
 
 #policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
-#load_weights(policy_net, "Linear_01.pt")
+#load_weights(policy_net, "Linear_02.pt")
 policy_net.eval()
 
 for episode in range(1):
@@ -559,7 +559,7 @@ em.close()
 
 # Let's observe the episode durations:
 
-# In[29]:
+# In[25]:
 
 
 print(f"First 100 episodes average: {get_moving_average(100, episode_durations[:100])[99]}")
