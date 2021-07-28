@@ -1,14 +1,23 @@
-#!/usr/bin/env python
-# coding: utf-8
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:light
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.11.4
+#   kernelspec:
+#     display_name: Python3 (RL virtualenv)
+#     language: python
+#     name: reinforcementl
+# ---
 
 # # Breakout training with CNN
 
 # ## Import Libraries
 
-# In[1]:
-
-
-get_ipython().run_line_magic('matplotlib', 'inline')
+# %matplotlib inline
 import os
 import gym
 import math
@@ -26,12 +35,12 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 
 
+version = "02"
+
+
 # ## Set Up Device
-# 
+#
 # We import IPython's display module to aid us in plotting images to the screen later.
-
-# In[2]:
-
 
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -39,9 +48,6 @@ if is_ipython:
 
 
 # ## Deep Q-Network
-
-# In[3]:
-
 
 class DQN(nn.Module):
   
@@ -63,7 +69,7 @@ class DQN(nn.Module):
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(img_height)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(img_width)))
         linear_input_size = convw * convh * 32
-        self.head = nn.Linear(linear_input_size, out_f)      
+        self.head = nn.Linear(linear_input_size, out_f)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -75,9 +81,7 @@ class DQN(nn.Module):
         return self.head(x.view(x.size(0), -1))
 
 
-# In[4]:
-
-
+# +
 folder_save = "models"
 os.makedirs(folder_save, exist_ok=True)
 
@@ -91,7 +95,7 @@ def load_weights(net, filename):
 def save_weights(net, filename: str):
     filename = os.path.join(folder_save, filename + ".pt")
     torch.save(net.state_dict(), filename)
-    
+
 def save_checkpoint(net, optimizer, num_episodes):
     checkpoint_dict = {
         "parameters": net.state_dict(),
@@ -102,10 +106,10 @@ def save_checkpoint(net, optimizer, num_episodes):
     torch.save(checkpoint_dict, filename)
 
 
+# -
+
+
 # ## Experience class
-
-# In[5]:
-
 
 Experience = namedtuple(
     'Experience',
@@ -113,17 +117,11 @@ Experience = namedtuple(
 )
 
 
-# In[6]:
-
-
 e = Experience(2,3,1,4)
 e
 
 
 # ## Replay Memory
-
-# In[7]:
-
 
 class ReplayMemory():
   
@@ -151,9 +149,6 @@ class ReplayMemory():
 
 # ## Epsilon Greedy Strategy
 
-# In[8]:
-
-
 class EpsilonGreedyStrategy():
 
     def __init__(self, start, end, decay):
@@ -167,15 +162,12 @@ class EpsilonGreedyStrategy():
 
 # ## Reinforcement Learning Agent
 
-# In[9]:
-
-
 class Agent():
 
     def __init__(self, strategy, num_actions, device):
         self.current_step = 0
         self.strategy = strategy
-        self.num_actions = num_actions # number ofaction that can be taken from a given state
+        self.num_actions = num_actions # number of actions that can be taken from a given state
         self.device = device
 
     def select_action(self, state, policy_net):
@@ -192,15 +184,12 @@ class Agent():
 
 # ## Environment Manager
 
-# In[10]:
-
-
 class EnvManager():
 
     def __init__(self, device):
         self.device = device
-        self.env = gym.make('Breakout-v0').unwrapped
-        #self.env = gym.make('BreakoutDeterministic-v4').unwrapped
+        #self.env = gym.make('Breakout-v0').unwrapped
+        self.env = gym.make('BreakoutDeterministic-v4').unwrapped
         #self.env = gym.make('BreakoutNoFrameskip-v4').unwrapped
         self.env.reset() # to have an initial observation of the env
         self.current_screen = None
@@ -257,12 +246,12 @@ class EnvManager():
         return self.transform_screen_data(screen)
 
     def crop_screen(self, screen):
-        screen_height = screen.shape[1]
+        screen_height = screen.shape[1] # Now the height is 1 since we changed the order in get_processed_screen()
 
         # Strip off top and bottom
         top = int(screen_height * 0.25)
         bottom = int(screen_height)
-        screen = screen[:, top:bottom, :]
+        screen = screen[:, top:bottom, :] # strips off the top 25% of the original screen
         return screen
 
     def transform_screen_data(self, screen):       
@@ -273,7 +262,7 @@ class EnvManager():
         # Use torchvision package to compose image transforms
         resize = T.Compose([
             T.ToPILImage()
-            ,T.Resize((40,90))
+            ,T.Resize((40,90)) # resize to 40x90 image
             ,T.ToTensor()
         ])
 
@@ -284,9 +273,7 @@ class EnvManager():
 
 # #### Non-Processed Screen
 
-# In[11]:
-
-
+# +
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 em = EnvManager(device)
 em.reset()
@@ -296,39 +283,36 @@ plt.figure()
 plt.imshow(screen)
 plt.title('Non-processed screen example')
 plt.show()
+# -
 
 
 # #### Processed Screen
 
-# In[12]:
-
-
+# +
 screen = em.get_processed_screen()
 
 plt.figure()
 plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
 plt.title('Processed screen example')
 plt.show()
+# -
 
 
 # #### Starting State
 
-# In[13]:
-
-
+# +
 screen = em.get_state()
 
 plt.figure()
 plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
 plt.title('Starting state example')
 plt.show()
+# -
 
 
 # #### Non-Starting State
 
-# In[14]:
-
-
+# +
 for i in range(5):
     em.take_action(torch.tensor([1]))
 screen = em.get_state()
@@ -337,13 +321,12 @@ plt.figure()
 plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
 plt.title('Non starting state example')
 plt.show()
+# -
 
 
 # #### Ending State
 
-# In[15]:
-
-
+# +
 em.done = True
 screen = em.get_state()
 
@@ -354,13 +337,14 @@ plt.show()
 em.close()
 
 
+# -
+
+
 # ## Utility Functions
 
 # ### Plotting
 
-# In[16]:
-
-
+# +
 def plot_durations(values, moving_avg_period):
     ax1 = plt.subplot(1, 2, 1)
     plt.clf()  # Clear the current figure.
@@ -395,10 +379,10 @@ def get_moving_average(period, values):
     return moving_avg.numpy()
 
 
+# -
+
+
 # ### Tensor Processing
-
-# In[17]:
-
 
 def extract_tensors(experiences):
     # Convert batch of Experiences to Experience of batches
@@ -413,21 +397,17 @@ def extract_tensors(experiences):
 
 
 # **Exapmple of `Experience(*zip(*experiences))` used above.**
-# 
+#
 # See https://stackoverflow.com/a/19343/3343043 for further explanation.
 
-# In[18]:
-
-
+# +
 e1 = Experience(1,1,1,1)
 e2 = Experience(2,2,2,2)
 e3 = Experience(3,3,3,3)
 
 experiences = [e1,e2,e3]
 experiences
-
-
-# In[19]:
+# -
 
 
 batch = Experience(*zip(*experiences))
@@ -435,9 +415,6 @@ batch
 
 
 # ## Q-Value Calculator
-
-# In[20]:
-
 
 class QValues():
 
@@ -460,7 +437,25 @@ class QValues():
 
 # ## Main Program
 
-# In[21]:
+# +
+# Essential Objects
+
+# if gpu is to be used
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Training on device: {device}")
+
+em = EnvManager(device)
+strategy = EpsilonGreedyStrategy(eps_start, eps_end, eps_decay)
+agent = Agent(strategy, em.num_actions_available(), device)
+memory = ReplayMemory(memory_size)
+
+policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
+target_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
+target_net.load_state_dict(policy_net.state_dict())
+target_net.eval()  # since we only use this net for inference
+
+optimizer = optim.RMSprop(params = policy_net.parameters(), lr = lr)
+# -
 
 
 # Hyperparameters
@@ -475,35 +470,12 @@ lr = 0.001
 num_episodes = 1000
 
 
-# In[22]:
-
-
-# Essential Objects
-
-# if gpu is to be used
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Training on {device}")
-
-em = EnvManager(device)
-strategy = EpsilonGreedyStrategy(eps_start, eps_end, eps_decay)
-agent = Agent(strategy, em.num_actions_available(), device)
-memory = ReplayMemory(memory_size)
-
-policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
-target_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
-target_net.load_state_dict(policy_net.state_dict())
-target_net.eval()  # since we only use this net for inference
-
-optimizer = optim.Adam(params=policy_net.parameters(), lr=lr)
-
-
 # ### Training Loop
 
-# In[23]:
-
-
+# +
 episode_durations = []
 episode_rewards = []
+losses = []
 
 policy_net.train()
 
@@ -529,6 +501,7 @@ for episode in range(num_episodes):
             target_q_values = rewards + (gamma * next_q_values)  # Bellman's equation
 
             loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
+            losses.append(loss)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -544,17 +517,16 @@ for episode in range(num_episodes):
         exchange_weights(target_net, policy_net)
         save_checkpoint(policy_net, optimizer, num_episodes)
 
-save_weights(policy_net, "CNN_01")
+save_weights(policy_net, "CNN_" + version)
 em.close()
+# -
 
 
 # Let's play an episode to see if it learned to play:
 
-# In[29]:
-
-
+# +
 #policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
-#load_weights(policy_net, "CNN_01.pt")
+#load_weights(policy_net, "CNN_" + version + ".pt")
 policy_net.eval()
 
 for episode in range(1):
@@ -568,13 +540,11 @@ for episode in range(1):
         state = em.get_state()
         if em.done:
             break
-        
+
 em.close()
 
 
-# In[ ]:
-
-
+# +
 # restore checkpoint
 # filename = os.path.join(folder_save, "checkpoint.pt")
 # checkpoint = torch.load(filename)
@@ -584,19 +554,14 @@ em.close()
 # episode_restart = checkpoint["episode"]
 # for epoch in range(episode_restart, num_episodes):
 #     # train loop
+# -
 
 
 # Let's observe the episode durations:
 
-# In[30]:
-
-
 print(f"First 100 episodes average: {get_moving_average(100, episode_durations[:100])[99]}")
 print(f"Last 100 episodes average: {get_moving_average(100, episode_durations[900:])[99]}")
 print(f"Middle 100 episodes average: {get_moving_average(100, episode_durations[650:750])[99]}")
-
-
-# In[32]:
 
 
 print(np.max(episode_durations))
