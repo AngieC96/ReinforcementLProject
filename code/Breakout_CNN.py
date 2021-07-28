@@ -1,23 +1,14 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:light
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.5'
-#       jupytext_version: 1.11.4
-#   kernelspec:
-#     display_name: Python3 (RL virtualenv)
-#     language: python
-#     name: reinforcementl
-# ---
+#!/usr/bin/env python
+# coding: utf-8
 
 # # Breakout training with CNN
 
 # ## Import Libraries
 
-# %matplotlib inline
+# In[1]:
+
+
+get_ipython().run_line_magic('matplotlib', 'inline')
 import os
 import gym
 import math
@@ -35,12 +26,18 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 
 
+# In[2]:
+
+
 version = "02"
 
 
 # ## Set Up Device
-#
+# 
 # We import IPython's display module to aid us in plotting images to the screen later.
+
+# In[4]:
+
 
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -48,6 +45,9 @@ if is_ipython:
 
 
 # ## Deep Q-Network
+
+# In[28]:
+
 
 class DQN(nn.Module):
   
@@ -81,7 +81,9 @@ class DQN(nn.Module):
         return self.head(x.view(x.size(0), -1))
 
 
-# +
+# In[29]:
+
+
 folder_save = "models"
 os.makedirs(folder_save, exist_ok=True)
 
@@ -106,10 +108,10 @@ def save_checkpoint(net, optimizer, num_episodes):
     torch.save(checkpoint_dict, filename)
 
 
-# -
-
-
 # ## Experience class
+
+# In[30]:
+
 
 Experience = namedtuple(
     'Experience',
@@ -117,11 +119,17 @@ Experience = namedtuple(
 )
 
 
+# In[31]:
+
+
 e = Experience(2,3,1,4)
 e
 
 
 # ## Replay Memory
+
+# In[32]:
+
 
 class ReplayMemory():
   
@@ -149,6 +157,9 @@ class ReplayMemory():
 
 # ## Epsilon Greedy Strategy
 
+# In[33]:
+
+
 class EpsilonGreedyStrategy():
 
     def __init__(self, start, end, decay):
@@ -161,6 +172,9 @@ class EpsilonGreedyStrategy():
 
 
 # ## Reinforcement Learning Agent
+
+# In[35]:
+
 
 class Agent():
 
@@ -183,6 +197,9 @@ class Agent():
 
 
 # ## Environment Manager
+
+# In[36]:
+
 
 class EnvManager():
 
@@ -273,7 +290,9 @@ class EnvManager():
 
 # #### Non-Processed Screen
 
-# +
+# In[37]:
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 em = EnvManager(device)
 em.reset()
@@ -283,36 +302,39 @@ plt.figure()
 plt.imshow(screen)
 plt.title('Non-processed screen example')
 plt.show()
-# -
 
 
 # #### Processed Screen
 
-# +
+# In[38]:
+
+
 screen = em.get_processed_screen()
 
 plt.figure()
 plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
 plt.title('Processed screen example')
 plt.show()
-# -
 
 
 # #### Starting State
 
-# +
+# In[39]:
+
+
 screen = em.get_state()
 
 plt.figure()
 plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
 plt.title('Starting state example')
 plt.show()
-# -
 
 
 # #### Non-Starting State
 
-# +
+# In[40]:
+
+
 for i in range(5):
     em.take_action(torch.tensor([1]))
 screen = em.get_state()
@@ -321,12 +343,13 @@ plt.figure()
 plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
 plt.title('Non starting state example')
 plt.show()
-# -
 
 
 # #### Ending State
 
-# +
+# In[41]:
+
+
 em.done = True
 screen = em.get_state()
 
@@ -337,14 +360,13 @@ plt.show()
 em.close()
 
 
-# -
-
-
 # ## Utility Functions
 
 # ### Plotting
 
-# +
+# In[42]:
+
+
 def plot_durations(values, moving_avg_period):
     ax1 = plt.subplot(1, 2, 1)
     plt.clf()  # Clear the current figure.
@@ -379,10 +401,10 @@ def get_moving_average(period, values):
     return moving_avg.numpy()
 
 
-# -
-
-
 # ### Tensor Processing
+
+# In[43]:
+
 
 def extract_tensors(experiences):
     # Convert batch of Experiences to Experience of batches
@@ -397,17 +419,21 @@ def extract_tensors(experiences):
 
 
 # **Exapmple of `Experience(*zip(*experiences))` used above.**
-#
+# 
 # See https://stackoverflow.com/a/19343/3343043 for further explanation.
 
-# +
+# In[44]:
+
+
 e1 = Experience(1,1,1,1)
 e2 = Experience(2,2,2,2)
 e3 = Experience(3,3,3,3)
 
 experiences = [e1,e2,e3]
 experiences
-# -
+
+
+# In[45]:
 
 
 batch = Experience(*zip(*experiences))
@@ -415,6 +441,9 @@ batch
 
 
 # ## Q-Value Calculator
+
+# In[46]:
+
 
 class QValues():
 
@@ -437,7 +466,9 @@ class QValues():
 
 # ## Main Program
 
-# +
+# In[47]:
+
+
 # Essential Objects
 
 # if gpu is to be used
@@ -455,7 +486,9 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()  # since we only use this net for inference
 
 optimizer = optim.RMSprop(params = policy_net.parameters(), lr = lr)
-# -
+
+
+# In[48]:
 
 
 # Hyperparameters
@@ -472,7 +505,9 @@ num_episodes = 1000
 
 # ### Training Loop
 
-# +
+# In[24]:
+
+
 episode_durations = []
 episode_rewards = []
 losses = []
@@ -519,12 +554,13 @@ for episode in range(num_episodes):
 
 save_weights(policy_net, "CNN_" + version)
 em.close()
-# -
 
 
 # Let's play an episode to see if it learned to play:
 
-# +
+# In[25]:
+
+
 #policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
 #load_weights(policy_net, "CNN_" + version + ".pt")
 policy_net.eval()
@@ -544,7 +580,9 @@ for episode in range(1):
 em.close()
 
 
-# +
+# In[27]:
+
+
 # restore checkpoint
 # filename = os.path.join(folder_save, "checkpoint.pt")
 # checkpoint = torch.load(filename)
@@ -554,14 +592,19 @@ em.close()
 # episode_restart = checkpoint["episode"]
 # for epoch in range(episode_restart, num_episodes):
 #     # train loop
-# -
 
 
 # Let's observe the episode durations:
 
+# In[26]:
+
+
 print(f"First 100 episodes average: {get_moving_average(100, episode_durations[:100])[99]}")
 print(f"Last 100 episodes average: {get_moving_average(100, episode_durations[900:])[99]}")
 print(f"Middle 100 episodes average: {get_moving_average(100, episode_durations[650:750])[99]}")
+
+
+# In[27]:
 
 
 print(np.max(episode_durations))
