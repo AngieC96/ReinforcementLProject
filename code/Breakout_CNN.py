@@ -29,7 +29,7 @@ import torchvision.transforms as T
 # In[2]:
 
 
-version = "02"
+version = "03"
 
 
 # ## Set Up Device
@@ -46,42 +46,67 @@ if is_ipython:
 
 # ## Deep Q-Network
 
-# In[28]:
+# In[5]:
 
 
 class DQN(nn.Module):
+    """Initialize a deep Q-learning network
+    
+    Hints:
+    -----
+        Original paper for DQN
+    https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
+    """
   
-    def __init__(self, img_height, img_width, out_f):
+    def __init__(self, img_height, img_width, n_actions):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
-        self.bn3 = nn.BatchNorm2d(32)
+        self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
         
         # Number of Linear input connections depends on output of conv2d layers
         # and therefore the input image size, so compute it.
-        def conv2d_size_out(size, kernel_size = 5, stride = 2):
-            return (size - (kernel_size - 1) - 1) // stride  + 1
+        # https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html?highlight=conv2d#torch.nn.Conv2d
+        def conv2d_size_out(size, kernel_size, stride=1, padding=0):
+            return int(size + 2 * padding - kernel_size) // stride  + 1
         
-        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(img_height)))
-        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(img_width)))
-        linear_input_size = convw * convh * 32
-        self.head = nn.Linear(linear_input_size, out_f)
+        convw = conv2d_size_out(
+                    conv2d_size_out(
+                        conv2d_size_out(img_height, kernel_size=8, stride=4
+                    ), kernel_size=4, stride=2
+                ), kernel_size=3, stride=1)
+        convh = conv2d_size_out(
+                    conv2d_size_out(
+                        conv2d_size_out(img_width, kernel_size=8, stride=4
+                    ), kernel_size=4, stride=2
+                ), kernel_size=3, stride=1)
+        
+        linear_input_size = convw * convh * 64  # = 7 * 7 * 64 = 3136
+        
+        self.fc1 = nn.Linear(linear_input_size, 512)
+        self.fc2 = nn.Linear(512, n_actions)
 
-    # Called with either one element to determine next action, or a batch
-    # during optimization. Returns tensor([[left0exp,right0exp]...]).
+
     def forward(self, x):
+        """
+        Calculates probability of each action.
+        Called with either one element to determine next action, or a batch during optimization.
+        NOTE: a single discrete state is collection of 4 frames
+        :param x: processed state of shape b x 4 x 84 x 84
+        :returns tensor of shape [batch_size, n_actions] (estimated action values)
+        """
         x = x.to(device)
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = F.relu(self.bn3(self.conv3(x)))
-        return self.head(x.view(x.size(0), -1))
+        x = F.relu(self.conv1(x))  # b x 32 x 20 x 20
+        x = F.relu(self.conv2(x))  # b x 64 x 9 x 9
+        x = F.relu(self.conv3(x))  # b x 64 x 7 x 7
+        x = x.view(x.size(0), -1)  # b x (7 * 7 * 64)
+        x = F.relu(self.fc1(x))    # b x 512
+        x = self.fc2(x)            # b x  4
+        return x
 
 
-# In[29]:
+# In[6]:
 
 
 folder_save = "models"
@@ -97,20 +122,22 @@ def load_weights(net, filename):
 def save_weights(net, filename: str):
     filename = os.path.join(folder_save, filename + ".pt")
     torch.save(net.state_dict(), filename)
-
-def save_checkpoint(net, optimizer, num_episodes):
+    
+def save_checkpoint(n, net, optimizer, num_episodes):
     checkpoint_dict = {
         "parameters": net.state_dict(),
         "optimizer": optimizer.state_dict(),
         "episode": num_episodes
     }
-    filename = os.path.join(folder_save, "checkpoint.pt")
+    folder_checkp = "models"
+    os.makedirs(folder_checkp, exist_ok=True)
+    filename = os.path.join(folder_save, folder_checkp, "checkpoint_" + n +".pt")
     torch.save(checkpoint_dict, filename)
 
 
 # ## Experience class
 
-# In[30]:
+# In[7]:
 
 
 Experience = namedtuple(
@@ -119,7 +146,7 @@ Experience = namedtuple(
 )
 
 
-# In[31]:
+# In[8]:
 
 
 e = Experience(2,3,1,4)
@@ -128,7 +155,7 @@ e
 
 # ## Replay Memory
 
-# In[32]:
+# In[10]:
 
 
 class ReplayMemory():
@@ -157,7 +184,7 @@ class ReplayMemory():
 
 # ## Epsilon Greedy Strategy
 
-# In[33]:
+# In[11]:
 
 
 class EpsilonGreedyStrategy():
@@ -173,7 +200,7 @@ class EpsilonGreedyStrategy():
 
 # ## Reinforcement Learning Agent
 
-# In[35]:
+# In[12]:
 
 
 class Agent():
@@ -198,7 +225,7 @@ class Agent():
 
 # ## Environment Manager
 
-# In[36]:
+# In[13]:
 
 
 class EnvManager():
@@ -290,7 +317,7 @@ class EnvManager():
 
 # #### Non-Processed Screen
 
-# In[37]:
+# In[14]:
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -306,7 +333,7 @@ plt.show()
 
 # #### Processed Screen
 
-# In[38]:
+# In[15]:
 
 
 screen = em.get_processed_screen()
@@ -317,58 +344,15 @@ plt.title('Processed screen example')
 plt.show()
 
 
-# #### Starting State
-
-# In[39]:
-
-
-screen = em.get_state()
-
-plt.figure()
-plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
-plt.title('Starting state example')
-plt.show()
-
-
-# #### Non-Starting State
-
-# In[40]:
-
-
-for i in range(5):
-    em.take_action(torch.tensor([1]))
-screen = em.get_state()
-
-plt.figure()
-plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
-plt.title('Non starting state example')
-plt.show()
-
-
-# #### Ending State
-
-# In[41]:
-
-
-em.done = True
-screen = em.get_state()
-
-plt.figure()
-plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
-plt.title('Ending state example')
-plt.show()
-em.close()
-
-
 # ## Utility Functions
 
 # ### Plotting
 
-# In[42]:
+# In[16]:
 
 
 def plot_durations(values, moving_avg_period):
-    ax1 = plt.subplot(1, 2, 1)
+    plt.figure(1, figsize=(10,7))
     plt.clf()  # Clear the current figure.
     plt.xlabel('Episode', fontsize=14)
     plt.ylabel('Duration', fontsize=14)
@@ -380,7 +364,7 @@ def plot_durations(values, moving_avg_period):
     #if is_ipython: display.clear_output(wait=True)
 
 def plot_rewards(values, moving_avg_period):
-    ax2 = plt.subplot(1, 2, 2)
+    plt.figure(2, figsize=(10,7))
     plt.clf()
     plt.xlabel('Episode', fontsize=14)
     plt.ylabel('Reward', fontsize=14)
@@ -400,10 +384,18 @@ def get_moving_average(period, values):
         moving_avg = torch.zeros(len(values))
     return moving_avg.numpy()
 
+def plot_loss(values):
+    plt.figure(3, figsize=(10,7))
+    plt.xlabel('Episode', fontsize=14)
+    plt.ylabel('Loss', fontsize=14)
+    plt.plot(values)
+    plt.pause(0.001)
+    if is_ipython: display.clear_output(wait=True)
+
 
 # ### Tensor Processing
 
-# In[43]:
+# In[17]:
 
 
 def extract_tensors(experiences):
@@ -422,7 +414,7 @@ def extract_tensors(experiences):
 # 
 # See https://stackoverflow.com/a/19343/3343043 for further explanation.
 
-# In[44]:
+# In[18]:
 
 
 e1 = Experience(1,1,1,1)
@@ -433,7 +425,7 @@ experiences = [e1,e2,e3]
 experiences
 
 
-# In[45]:
+# In[19]:
 
 
 batch = Experience(*zip(*experiences))
@@ -442,7 +434,7 @@ batch
 
 # ## Q-Value Calculator
 
-# In[46]:
+# In[20]:
 
 
 class QValues():
@@ -466,7 +458,22 @@ class QValues():
 
 # ## Main Program
 
-# In[47]:
+# In[21]:
+
+
+# Hyperparameters
+batch_size = 256
+gamma = 0.999
+eps_start = 1
+eps_end = 0.01
+eps_decay = 0.001
+target_update = 50
+memory_size = 100000
+lr = 0.001
+num_episodes = 1000
+
+
+# In[22]:
 
 
 # Essential Objects
@@ -488,24 +495,9 @@ target_net.eval()  # since we only use this net for inference
 optimizer = optim.RMSprop(params = policy_net.parameters(), lr = lr)
 
 
-# In[48]:
-
-
-# Hyperparameters
-batch_size = 256
-gamma = 0.999
-eps_start = 1
-eps_end = 0.01
-eps_decay = 0.001
-target_update = 50
-memory_size = 100000
-lr = 0.001
-num_episodes = 1000
-
-
 # ### Training Loop
 
-# In[24]:
+# In[ ]:
 
 
 episode_durations = []
@@ -558,7 +550,7 @@ em.close()
 
 # Let's play an episode to see if it learned to play:
 
-# In[25]:
+# In[ ]:
 
 
 #policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
@@ -580,7 +572,7 @@ for episode in range(1):
 em.close()
 
 
-# In[27]:
+# In[ ]:
 
 
 # restore checkpoint
@@ -596,7 +588,7 @@ em.close()
 
 # Let's observe the episode durations:
 
-# In[26]:
+# In[ ]:
 
 
 print(f"First 100 episodes average: {get_moving_average(100, episode_durations[:100])[99]}")
@@ -604,7 +596,7 @@ print(f"Last 100 episodes average: {get_moving_average(100, episode_durations[90
 print(f"Middle 100 episodes average: {get_moving_average(100, episode_durations[650:750])[99]}")
 
 
-# In[27]:
+# In[ ]:
 
 
 print(np.max(episode_durations))
