@@ -9,7 +9,7 @@
 
 # ## Import Libraries
 
-# In[7]:
+# In[1]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -59,34 +59,59 @@ print(env.observation_space)
 
 # The `Discrete` space allows a fixed range of non-negative numbers, so in this case valid `action`s are 0 or 1 or 2 or 3. The `Box` space represents an `n`-dimensional box, so valid `observations` will be ????.
 
-# In[10]:
+# In[4]:
 
 
 help(env.unwrapped)
 
 
-# In[4]:
+# In[5]:
 
 
 env.unwrapped.get_action_meanings()
 
 
-# In[11]:
+# In[6]:
 
 
 env.unwrapped.get_keys_to_action()
 
 
+# In[7]:
+
+
+env.unwrapped.reward_range
+
+
+# In[8]:
+
+
+env.unwrapped.spec
+
+
+# In[9]:
+
+
+env.ale.lives()
+
+
+# In[10]:
+
+
+env.reset()
+env.ale.lives()
+
+
 # We can also check the `Box`'s bounds:
 
-# In[5]:
+# In[11]:
 
 
 print(env.observation_space.high)
 print(env.observation_space.low)
 
 
-# In[6]:
+# In[12]:
 
 
 for i_episode in range(20):
