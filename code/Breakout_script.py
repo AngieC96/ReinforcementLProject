@@ -25,7 +25,7 @@ import torchvision.transforms as T
 
 
 # Tracking version for saving weights
-version = "04"
+version = "05"
 
 
 # Creates the game environment
@@ -314,8 +314,6 @@ class EnvManager():
 folder_figs = "figures"
 os.makedirs(folder_figs, exist_ok=True)
 
-save_fig_step = 200
-
 def plot_durations(values, moving_avg_period, episode):
     plt.figure(1, figsize=(10,5))
     plt.clf()  # Clear the current figure.
@@ -343,7 +341,7 @@ def plot_rewards(values, moving_avg_period, episode):
 def get_moving_average(period, values):
     values = torch.tensor(values, dtype=torch.float)
     if len(values) >= period:
-        moving_avg = values.unfold(dimension=0, size=period, step=1)             .mean(dim=1).flatten(start_dim=0)
+        moving_avg = values.unfold(dimension=0, size=period, step=1).mean(dim=1).flatten(start_dim=0)
         moving_avg = torch.cat((torch.zeros(period-1), moving_avg))
     else:
         moving_avg = torch.zeros(len(values))
@@ -421,6 +419,8 @@ memory_size         = 200_000
 lr                  = 0.00001
 num_episodes        = 15_000
 timestep_max        = 18_000      # Number of timesteps after which we end an episode
+
+save_fig_step       = 200
 
 
 # Essential Objects
@@ -524,22 +524,22 @@ for episode in range(1, num_episodes + 1): # I prefer starting from 1
             del next_q_values
             del target_q_values
             del loss
-
-        if episode % save_fig_step == 0:
+            
+        if em.done:
+            episode_durations.append(timestep)
+            episode_rewards.append(episode_reward)
             print("Episode", episode)
             print("Total steps done", tot_steps_done)
-            episode_durations.append(timestep)
-            plot_durations(episode_durations, 100, episode)
-            episode_rewards.append(episode_reward)
-            plot_rewards(episode_rewards, 100, episode)
-            plot_loss(losses, episode)
             if is_ipython: display.clear_output(wait=True)
-
-        if em.done:
             break
             
         if timestep > timestep_max:
             break
+
+    if episode % save_fig_step == 0:
+        plot_durations(episode_durations, 100, episode)
+        plot_rewards(episode_rewards, 100, episode)
+        plot_loss(losses, episode)
 
     if episode % target_net_update == 0:
         exchange_weights(target_net, policy_net)
