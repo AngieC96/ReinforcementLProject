@@ -30,7 +30,7 @@
 ## Queue, Walltime and Output
 #
 #[non mi serve] #SBATCH --array=001-010:001%6
-#SBATCH -p regular2,regular1,gpu1,gpu2  # Partition (queue) to be used
+#SBATCH -p regular2,regular1            # Partition (queue) to be used
 #SBATCH --time=12:00:00                 # Time limit hrs:min:sec
 #SBATCH --output=%x.o%j                 # Standard output log in TORQUE-style -- WARNING: %x requires a new enough SLURM. Use %j for regular jobs and %A-%a for array jobs
 #SBATCH --error=%x.e%j                  # Standard error  log in TORQUE-style -- WARNING: %x requires a new enough SLURM. Use %j for regular jobs and %A-%a for array jobs
@@ -56,7 +56,7 @@ cd $SLURM_SUBMIT_DIR
 
 source venv/bin/activate
 
-python3 Breakout_script.py
+/usr/bin/time -v python3 Breakout_script.py
 
 # ==== END OF JOB COMMANDS =====
 

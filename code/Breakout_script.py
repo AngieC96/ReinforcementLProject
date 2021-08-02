@@ -6,9 +6,8 @@
 # ## Import Libraries
 
 #get_ipython().run_line_magic('matplotlib', 'inline')
-import os
-from datetime import datetime
-import gym
+import os                                      # to create folders
+import gym                                     # contains the game environment
 import math
 import random
 import numpy as np
@@ -17,7 +16,9 @@ import matplotlib.pyplot as plt
 from collections import namedtuple
 from itertools import count
 from PIL import Image
-import torch
+from datetime import datetime                  # to print a timestamp
+import pickle                                  # to save on file
+import torch                                   # ANNs
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -25,7 +26,7 @@ import torchvision.transforms as T
 
 
 # Tracking version for saving weights
-version = "05"
+version = "04"
 
 
 # Creates the game environment
@@ -105,6 +106,13 @@ class DQN(nn.Module):
 
 folder_save = "models"
 os.makedirs(folder_save, exist_ok=True)
+folder_checkp = "checkpoints_" + version
+filename_checkp = os.path.join(folder_save, folder_checkp)
+os.makedirs(filename_checkp, exist_ok=True)
+
+filename_durations = "durations.pickle"
+filename_rewards   = "rewards.pickle"
+filename_losses    = "losses.pickle"
 
 def exchange_weights(net1, net2):
     net1.load_state_dict(net2.state_dict())
@@ -117,18 +125,32 @@ def save_weights(net, filename: str):
     filename = os.path.join(folder_save, filename + ".pt")
     torch.save(net.state_dict(), filename)
     
-def save_checkpoint(n, net, optimizer, num_episodes, tot_steps_done):
+def save_checkpoint(net, optimizer, episode, tot_steps_done):
     checkpoint_dict = {
         "parameters"    : net.state_dict(),
         "optimizer"     : optimizer.state_dict(),
-        "episode"       : num_episodes,
+        "episode"       : episode,
         "tot_steps_done": tot_steps_done
     }
-    folder_checkp = "checkpoints_" + version
-    filename = os.path.join(folder_save, folder_checkp)
-    os.makedirs(filename, exist_ok=True)
-    filename = os.path.join(filename, "checkpoint_" + str(n) +".pt")
+    filename_checkp = os.path.join(filename_checkp, "checkpoint_" + str(n) +".pt")
     torch.save(checkpoint_dict, filename)
+    
+def save_vectors4plots(episode_durations, episode_rewards, losses):
+    # save the vectors
+    filename_durations = os.path.join(filename_checkp, filename_durations)
+    outfile = open(filename_durations, 'wb')
+    pickle.dump(episode_durations, outfile)
+    outfile.close()
+    
+    filename_rewards = os.path.join(filename_checkp, filename_rewards)
+    outfile = open(filename_rewards, 'wb')
+    pickle.dump(episode_rewards, outfile)
+    outfile.close()
+    
+    filename_losses = os.path.join(filename_checkp, filename_losses)
+    outfile = open(filename_losses, 'wb')
+    pickle.dump(losses, outfile)
+    outfile.close()
 
 
 # ## Experience class
@@ -153,14 +175,14 @@ class StateHolder:
         self.number_screens = number_screens
         
     def push(self, screen):
-        new_screen = screen.squeeze(0)
+        new_screen = screen.squeeze(0) # If the first dimension (dim=0) of the tensor is 1, remove it
         if self.first_action:
             self.state[0] = new_screen
             for number in range(self.number_screens-1):
                 self.state = torch.cat((self.state, new_screen), 0)
             self.first_action = False
         else:
-            self.state = torch.cat((self.state, new_screen), 0)[1:]
+            self.state = torch.cat((self.state, new_screen), 0)[1:] # append the new frame and remove the first one, so that it will always contain 4 screens
     
     def get(self):
         return self.state.unsqueeze(0)
