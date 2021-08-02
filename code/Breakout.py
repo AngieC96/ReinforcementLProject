@@ -10,6 +10,7 @@
 
 get_ipython().run_line_magic('matplotlib', 'inline')
 import os
+from datetime import datetime
 import gym
 import math
 import random
@@ -29,7 +30,18 @@ import torchvision.transforms as T
 # In[2]:
 
 
+# Tracking version for saving weights
 version = "03"
+
+
+# In[3]:
+
+
+# Crea l'ambiente con il gioco
+
+#env = gym.make('Breakout-v0').unwrapped
+env = gym.make('BreakoutDeterministic-v4').unwrapped
+#env = gym.make('BreakoutNoFrameskip-v4').unwrapped
 
 
 # ## Set Up Device
@@ -100,7 +112,7 @@ class DQN(nn.Module):
         x = F.relu(self.conv1(x))  # b x 32 x 20 x 20
         x = F.relu(self.conv2(x))  # b x 64 x 9 x 9
         x = F.relu(self.conv3(x))  # b x 64 x 7 x 7
-        x = x.view(x.size(0), -1)  # b x (7 * 7 * 64)
+        x = x.view(x.size(0), -1)  # b x (7 * 7 * 64) x 1
         x = F.relu(self.fc1(x))    # b x 512
         x = self.fc2(x)            # b x  4
         return x
@@ -123,15 +135,17 @@ def save_weights(net, filename: str):
     filename = os.path.join(folder_save, filename + ".pt")
     torch.save(net.state_dict(), filename)
     
-def save_checkpoint(n, net, optimizer, num_episodes):
+def save_checkpoint(n, net, optimizer, num_episodes, tot_steps_done):
     checkpoint_dict = {
-        "parameters": net.state_dict(),
-        "optimizer": optimizer.state_dict(),
-        "episode": num_episodes
+        "parameters"    : net.state_dict(),
+        "optimizer"     : optimizer.state_dict(),
+        "episode"       : num_episodes,
+        "tot_steps_done": tot_steps_done
     }
-    folder_checkp = "models"
-    os.makedirs(folder_checkp, exist_ok=True)
-    filename = os.path.join(folder_save, folder_checkp, "checkpoint_" + n +".pt")
+    folder_checkp = "checkpoints_" + version
+    filename = os.path.join(folder_save, folder_checkp)
+    os.makedirs(filename, exist_ok=True)
+    filename = os.path.join(filename, "checkpoint_" + str(n) +".pt")
     torch.save(checkpoint_dict, filename)
 
 
@@ -153,6 +167,40 @@ e = Experience(2,3,1,4)
 e
 
 
+# ## StateHolder class
+
+# In[9]:
+
+
+class StateHolder:
+    """ Class which stores the state of the game.
+    We will use 4 consecutive frames of the game stacked together.
+    This is necessary for the agent to understand the speed and acceleration of game objects.
+    """
+    
+    def __init__(self, number_screens = 4):
+        self.first_action = True
+        self.state = torch.ByteTensor(1, 84, 84).to(device)
+        self.number_screens = number_screens
+        
+    def push(self, screen):
+        new_screen = screen.squeeze(0)
+        if self.first_action:
+            self.state[0] = new_screen
+            for number in range(self.number_screens-1):
+                self.state = torch.cat((self.state, new_screen), 0)
+            self.first_action = False
+        else:
+            self.state = torch.cat((self.state, new_screen), 0)[1:]
+    
+    def get(self):
+        return self.state.unsqueeze(0)
+
+    def reset(self):
+        self.first_action = True
+        self.state = torch.ByteTensor(1, 84, 84).to(device)
+
+
 # ## Replay Memory
 
 # In[10]:
@@ -165,11 +213,11 @@ class ReplayMemory():
         self.memory = []
         self.push_count = 0       # Number of experiences added to the memory
 
-    def push(self, experience):
+    def push(self, *args):
         if len(self.memory) < self.capacity:
-            self.memory.append(experience)
+            self.memory.append(Experience(*args))
         else:
-            self.memory[self.push_count % self.capacity] = experience  # overwrite the first experiences first
+            self.memory[self.push_count % self.capacity] = Experience(*args)  # overwrite the first experiences first
         self.push_count += 1
 
     def sample(self, batch_size):
@@ -195,7 +243,7 @@ class EpsilonGreedyStrategy():
         self.decay = decay
 
     def get_exploration_rate(self, agent_current_step):
-        return self.end + (self.start - self.end) *             math.exp(-1. * agent_current_step * self.decay)
+        return self.end + (self.start - self.end) * math.exp(-1. * agent_current_step * self.decay)
 
 
 # ## Reinforcement Learning Agent
@@ -207,20 +255,20 @@ class Agent():
 
     def __init__(self, strategy, num_actions, device):
         self.current_step = 0
-        self.strategy = strategy
-        self.num_actions = num_actions # number of actions that can be taken from a given state
-        self.device = device
+        self.strategy     = strategy
+        self.num_actions  = num_actions # number of actions that can be taken from a given state
+        self.device       = device
 
     def select_action(self, state, policy_net):
         rate = self.strategy.get_exploration_rate(self.current_step)
         self.current_step += 1
 
-        if rate > random.random():
+        if rate > random.random() and state is not None:
             action = random.randrange(self.num_actions)
-            return torch.tensor([action]).to(self.device) # explore      
+            return torch.tensor([[action]], device=self.device, dtype=torch.long) # explore      
         else:
             with torch.no_grad():  # since it's not training
-                return policy_net(state).argmax(dim=1).to(self.device) # exploit
+                return policy_net(state.float()).argmax(dim=1).to(self.device).view(1, 1) # exploit
 
 
 # ## Environment Manager
@@ -228,16 +276,19 @@ class Agent():
 # In[13]:
 
 
+STATE_W = 84
+STATE_H = 84
+
 class EnvManager():
 
-    def __init__(self, device):
+    def __init__(self, env, device):
         self.device = device
-        #self.env = gym.make('Breakout-v0').unwrapped
-        self.env = gym.make('BreakoutDeterministic-v4').unwrapped
-        #self.env = gym.make('BreakoutNoFrameskip-v4').unwrapped
+        self.env = env
         self.env.reset() # to have an initial observation of the env
+        self.max_lives = self.env.ale.lives()
         self.current_screen = None
         self.done = False
+        self.n_actions = self.env.action_space.n
 
     def reset(self):
         """ Resets the env to the initial state
@@ -253,12 +304,9 @@ class EnvManager():
     def render(self, mode='human'):
         return self.env.render(mode)
 
-    def num_actions_available(self):
-        return self.env.action_space.n
-
     def take_action(self, action):        
-        _, reward, self.done, _ = self.env.step(action.item())
-        return torch.tensor([reward], device=self.device)
+        _, reward, self.done, info = self.env.step(action.item())
+        return torch.tensor([reward], device=self.device), info
 
     def just_starting(self):
         return self.current_screen is None
@@ -266,15 +314,9 @@ class EnvManager():
     def get_state(self):
         """ Returns the current state of the env in the form of a procesed image of the screen
         """
-        if self.just_starting() or self.done:
-            self.current_screen = self.get_processed_screen()
-            black_screen = torch.zeros_like(self.current_screen)
-            return black_screen
-        else:
-            s1 = self.current_screen
-            s2 = self.get_processed_screen()
-            self.current_screen = s2
-            return s2 - s1
+        s = self.get_processed_screen()
+        self.current_screen = s
+        return s
 
     def get_screen_height(self):
         screen = self.get_processed_screen()
@@ -285,32 +327,27 @@ class EnvManager():
         return screen.shape[3]
 
     def get_processed_screen(self):
-        screen = self.render(mode='rgb_array').transpose((2, 0, 1)) # PyTorch expects CHW
+        screen = self.render(mode='rgb_array')
+        screen = np.dot(screen[...,:3], [0.299, 0.587, 0.114])
         screen = self.crop_screen(screen)
         return self.transform_screen_data(screen)
 
     def crop_screen(self, screen):
-        screen_height = screen.shape[1] # Now the height is 1 since we changed the order in get_processed_screen()
-
         # Strip off top and bottom
-        top = int(screen_height * 0.25)
-        bottom = int(screen_height)
-        screen = screen[:, top:bottom, :] # strips off the top 25% of the original screen
-        return screen
+        return screen[32:195,:]
 
     def transform_screen_data(self, screen):       
-        # Convert to float, rescale, convert to tensor
-        screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
-        screen = torch.from_numpy(screen)
+        # Convert to uint, rescale, convert to tensor
+        screen = np.ascontiguousarray(screen, dtype=np.uint8).reshape(screen.shape[0],screen.shape[1],1)
 
         # Use torchvision package to compose image transforms
         resize = T.Compose([
-            T.ToPILImage()
-            ,T.Resize((40,90)) # resize to 40x90 image
-            ,T.ToTensor()
+            T.ToPILImage(),
+            T.Resize((STATE_W, STATE_H)),
+            T.ToTensor()
         ])
 
-        return resize(screen).unsqueeze(0).to(self.device) # add a batch dimension (BCHW)
+        return resize(screen).mul(255).type(torch.ByteTensor).to(device).detach().unsqueeze(0) # add a batch dimension (BCHW)
 
 
 # ### Example Screens
@@ -321,7 +358,7 @@ class EnvManager():
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-em = EnvManager(device)
+em = EnvManager(env, device)
 em.reset()
 screen = em.render('rgb_array')
 
@@ -339,8 +376,15 @@ plt.show()
 screen = em.get_processed_screen()
 
 plt.figure()
-plt.imshow(screen.squeeze(0).permute(1, 2, 0).cpu(), interpolation='none')
+plt.imshow(screen.cpu().reshape(-1,84).numpy(),
+           interpolation='none')
 plt.title('Processed screen example')
+plt.show()
+
+plt.figure()
+plt.imshow(screen.cpu().reshape(-1,84).numpy(),
+           interpolation='none', cmap = 'gray')
+plt.title('Processed screen gray')
 plt.show()
 
 
@@ -351,29 +395,36 @@ plt.show()
 # In[16]:
 
 
+folder_figs = "figures"
+os.makedirs(folder_figs, exist_ok=True)
+
 def plot_durations(values, moving_avg_period):
-    plt.figure(1, figsize=(10,7))
+    plt.figure(1, figsize=(10,5))
     plt.clf()  # Clear the current figure.
     plt.xlabel('Episode', fontsize=14)
     plt.ylabel('Duration', fontsize=14)
     plt.plot(values)
     moving_avg = get_moving_average(moving_avg_period, values)
-    plt.plot(moving_avg)    
-    plt.pause(0.001)
+    plt.plot(moving_avg)
+    filename = os.path.join(folder_figs, "durations_" + version + ".png")
+    plt.savefig(filename)
+    plt.show()
     print("Episode", len(values), "\n",         moving_avg_period, "episode duration moving avg:", moving_avg[-1])
     #if is_ipython: display.clear_output(wait=True)
 
 def plot_rewards(values, moving_avg_period):
-    plt.figure(2, figsize=(10,7))
+    plt.figure(2, figsize=(10,5))
     plt.clf()
     plt.xlabel('Episode', fontsize=14)
     plt.ylabel('Reward', fontsize=14)
     plt.plot(values)
     moving_avg = get_moving_average(moving_avg_period, values)
-    plt.plot(moving_avg)    
-    plt.pause(0.001)
+    plt.plot(moving_avg)
+    filename = os.path.join(folder_figs, "rewards_" + version + ".png")
+    plt.savefig(filename)
+    plt.show()
     print("Episode", len(values), "\n",         moving_avg_period, "episode reward moving avg:", moving_avg[-1])
-    if is_ipython: display.clear_output(wait=True)
+    #if is_ipython: display.clear_output(wait=True)
 
 def get_moving_average(period, values):
     values = torch.tensor(values, dtype=torch.float)
@@ -385,11 +436,13 @@ def get_moving_average(period, values):
     return moving_avg.numpy()
 
 def plot_loss(values):
-    plt.figure(3, figsize=(10,7))
-    plt.xlabel('Episode', fontsize=14)
+    plt.figure(3, figsize=(10,5))
+    plt.xlabel('Update', fontsize=14)
     plt.ylabel('Loss', fontsize=14)
     plt.plot(values)
-    plt.pause(0.001)
+    filename = os.path.join(folder_figs, "loss_" + version + ".png")
+    plt.savefig(filename)
+    plt.show()
     if is_ipython: display.clear_output(wait=True)
 
 
@@ -399,20 +452,22 @@ def plot_loss(values):
 
 
 def extract_tensors(experiences):
-    # Convert batch of Experiences to Experience of batches
+    """ Transposes the batch.
+    This converts batch-array of Experiences to Experience of batches (batch-arrays)
+    """
     batch = Experience(*zip(*experiences))
 
-    t1 = torch.cat(batch.state)
+    t1 = torch.cat(batch.state).float().to(device)
     t2 = torch.cat(batch.action)
-    t3 = torch.cat(batch.reward)
-    t4 = torch.cat(batch.next_state)
+    t3 = batch.next_state   # I don't want to concatenate all the next_states
+    t4 = torch.cat(batch.reward)
 
     return (t1,t2,t3,t4)
 
 
 # **Exapmple of `Experience(*zip(*experiences))` used above.**
 # 
-# See https://stackoverflow.com/a/19343/3343043 for further explanation.
+# See https://stackoverflow.com/a/19343/3343043 for detailed explanation.
 
 # In[18]:
 
@@ -443,16 +498,28 @@ class QValues():
 
     @staticmethod
     def get_current(policy_net, states, actions):
-        return policy_net(states).gather(dim=1, index=actions.unsqueeze(-1))
+        """ Compute Q(s_t, a) - the model computes Q(s_t), then we select the columns of actions taken.
+            These are the actions which would've been taken for each batch state according to policy_net
+        """
+        return policy_net(states).gather(dim=1, index=actions)
 
     @staticmethod        
-    def get_next(target_net, next_states):                
-        final_state_locations = next_states.flatten(start_dim=1)             .max(dim=1)[0].eq(0).type(torch.bool)
-        non_final_state_locations = (final_state_locations == False)
-        non_final_states = next_states[non_final_state_locations]
-        batch_size = next_states.shape[0]
-        values = torch.zeros(batch_size).to(QValues.device)
-        values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detach()
+    def get_next(policy_net, target_net, next_states):
+        # Compute a mask of non-final states and concatenate the batch elements
+        # (a final state would've been the one after which simulation ended)
+        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, next_states)),
+                                        device=device, dtype=torch.bool)
+        non_final_next_states = torch.cat([s for s in next_states if s is not None]).float().to(device)
+    
+        # Compute V(s_{t+1}) for all next states.
+        # Expected values of actions for non_final_next_states are computed based
+        # on the "older" target_net; selecting their best reward with max(1)[0].
+        # This is merged based on the mask, such that we'll have either the expected
+        # state value or 0 in case the state was final.
+        batch_size = len(next_states) # Since I didn't concatenate the states
+        values = torch.zeros(batch_size, device=QValues.device)
+        action = policy_net(non_final_next_states).detach().argmax(dim=1).view(-1,1)
+        values[non_final_mask] = target_net(non_final_next_states).detach().gather(1, action).view(-1)
         return values
 
 
@@ -462,15 +529,17 @@ class QValues():
 
 
 # Hyperparameters
-batch_size = 256
-gamma = 0.999
-eps_start = 1
-eps_end = 0.01
-eps_decay = 0.001
-target_update = 50
-memory_size = 100000
-lr = 0.001
-num_episodes = 1000
+batch_size          = 32
+gamma               = 0.99
+eps_start           = 1           #
+eps_end             = 0.1         # parameters for e-greedy strategy for action selection
+eps_decay           = 0.0000001   #
+optimize_model_step = 4           # Number of frames after which we train the model 
+target_net_update   = 10          # Number of episodes after which we update the target model
+memory_size         = 200_000
+lr                  = 0.00001
+num_episodes        = 15_000
+timestep_max        = 18_000      # Number of timesteps after which we end an episode
 
 
 # In[22]:
@@ -482,20 +551,30 @@ num_episodes = 1000
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Training on device: {device}")
 
-em = EnvManager(device)
-strategy = EpsilonGreedyStrategy(eps_start, eps_end, eps_decay)
-agent = Agent(strategy, em.num_actions_available(), device)
-memory = ReplayMemory(memory_size)
+em           = EnvManager(env, device)
+strategy     = EpsilonGreedyStrategy(eps_start, eps_end, eps_decay)
+agent        = Agent(strategy, em.n_actions, device)
+memory       = ReplayMemory(memory_size)
+state_holder = StateHolder()
 
-policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
-target_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
+policy_net   = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
+target_net   = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()  # since we only use this net for inference
 
-optimizer = optim.RMSprop(params = policy_net.parameters(), lr = lr)
+optimizer = optim.Adam(params = policy_net.parameters(), lr = lr)
 
 
 # ### Training Loop
+
+# In[23]:
+
+
+# datetime object containing current date and time
+start = datetime.now()
+# format: dd/mm/YY H:M:S
+print("Starting date and time: ", start.strftime("%d/%m/%Y %H:%M:%S"))
+
 
 # In[ ]:
 
@@ -503,34 +582,64 @@ optimizer = optim.RMSprop(params = policy_net.parameters(), lr = lr)
 episode_durations = []
 episode_rewards = []
 losses = []
+tot_steps_done = 0
 
 policy_net.train()
 
-for episode in range(num_episodes):
+for episode in range(num_episodes + 1):
     em.reset()
-    state = em.get_state()
+    state_holder.push(em.get_state())
     episode_reward = 0
+    lives = em.max_lives
 
     for timestep in count():
+        # Transition handling code
+        state  = state_holder.get()
         action = agent.select_action(state, policy_net)
-        reward = em.take_action(action)
+        reward, info = em.take_action(action)
         episode_reward += reward
-        next_state = em.get_state()
-        memory.push(Experience(state, action, next_state, reward))
+        life = info['ale.lives'] # or em.env.ale.lives()
+        
+        state_holder.push(em.get_state())
+        next_state = state_holder.get()
+        
+        # Trick to significantly improve the convergence of training: if the episode did not end but the
+        # agent lost a life, then such a transition should be put in ReplayMemory as the final one.
+        # In this case, it is necessary to continue the episode until done == True
+        # At the same time, you will teach the agent that losing lives is bad.
+        
+        if not em.done:
+            if life < lives:
+                next_state, lives = (None, life)
+        else:
+            next_state = None
+            reward = torch.zeros_like(reward) # It has to be a Tensor!
+        memory.push(state.to('cpu'), action, next_state, reward)
         state = next_state
-
-        if memory.can_provide_sample(batch_size):
+        
+        tot_steps_done += 1
+        
+        # Optimization step
+        if memory.can_provide_sample(batch_size) and tot_steps_done % optimize_model_step == 0:
             experiences = memory.sample(batch_size)
-            states, actions, rewards, next_states = extract_tensors(experiences)
+            
+            states, actions, next_states, rewards = extract_tensors(experiences)
 
             current_q_values = QValues.get_current(policy_net, states, actions)
-            next_q_values = QValues.get_next(target_net, next_states)
-            target_q_values = rewards + (gamma * next_q_values)  # Bellman's equation
-
-            loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
+            next_q_values = QValues.get_next(policy_net, target_net, next_states)
+            # Compute the expected Q values using the Bellman's equation
+            target_q_values = rewards + (gamma * next_q_values)
+            
+            # Compute Huber loss
+            loss = F.smooth_l1_loss(current_q_values, target_q_values.unsqueeze(1))
+            # loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
             losses.append(loss)
+            
+            # Optimizing the model
             optimizer.zero_grad()
             loss.backward()
+            for param in policy_net.parameters():
+                param.grad.data.clamp_(-1, 1)
             optimizer.step()
 
         if em.done:
@@ -538,14 +647,27 @@ for episode in range(num_episodes):
             plot_durations(episode_durations, 100)
             episode_rewards.append(episode_reward)
             plot_rewards(episode_rewards, 100)
+            plot_loss(losses)
+            break
+            
+        if timestep > timestep_max:
             break
 
-    if episode % target_update == 0:
+    if episode % target_net_update == 0:
         exchange_weights(target_net, policy_net)
-        save_checkpoint(policy_net, optimizer, num_episodes)
+        save_checkpoint(episode, policy_net, optimizer, num_episodes, tot_steps_done)
 
 save_weights(policy_net, "CNN_" + version)
 em.close()
+
+
+# In[ ]:
+
+
+end = datetime.now()
+# format: dd/mm/YY H:M:S
+print(f"Finishing date and time: ", end.strftime("%d/%m/%Y %H:%M:%S"))
+print(f"Total time training: {end-start}")
 
 
 # Let's play an episode to see if it learned to play:
@@ -553,7 +675,7 @@ em.close()
 # In[ ]:
 
 
-#policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.num_actions_available()).to(device)
+#policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
 #load_weights(policy_net, "CNN_" + version + ".pt")
 policy_net.eval()
 
@@ -568,7 +690,7 @@ for episode in range(1):
         state = em.get_state()
         if em.done:
             break
-
+        
 em.close()
 
 
@@ -584,22 +706,4 @@ em.close()
 # episode_restart = checkpoint["episode"]
 # for epoch in range(episode_restart, num_episodes):
 #     # train loop
-
-
-# Let's observe the episode durations:
-
-# In[ ]:
-
-
-print(f"First 100 episodes average: {get_moving_average(100, episode_durations[:100])[99]}")
-print(f"Last 100 episodes average: {get_moving_average(100, episode_durations[900:])[99]}")
-print(f"Middle 100 episodes average: {get_moving_average(100, episode_durations[650:750])[99]}")
-
-
-# In[ ]:
-
-
-print(np.max(episode_durations))
-print(np.argmax(episode_durations))
-print(episode_rewards[np.argmax(episode_durations)].item())
 
