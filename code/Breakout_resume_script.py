@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Breakout training with CNN
+# # Resume Breakout training with CNN
 
 # ## Import Libraries
 
@@ -30,7 +30,7 @@ import torchvision.transforms as T
 version = "02"
 
 
-# Creates the game environment
+# Crea l'ambiente con il gioco
 
 #env = gym.make('Breakout-v0').unwrapped
 env = gym.make('BreakoutDeterministic-v4').unwrapped
@@ -163,14 +163,14 @@ class StateHolder:
         self.number_screens = number_screens
         
     def push(self, screen):
-        new_screen = screen.squeeze(0) # If the first dimension (dim=0) of the tensor is 1, remove it
+        new_screen = screen.squeeze(0)
         if self.first_action:
             self.state[0] = new_screen
             for number in range(self.number_screens-1):
                 self.state = torch.cat((self.state, new_screen), 0)
             self.first_action = False
         else:
-            self.state = torch.cat((self.state, new_screen), 0)[1:] # append the new frame and remove the first one, so that it will always contain 4 screens
+            self.state = torch.cat((self.state, new_screen), 0)[1:]
     
     def get(self):
         return self.state.unsqueeze(0)
@@ -349,7 +349,7 @@ def plot_rewards(values, moving_avg_period):
 def get_moving_average(period, values):
     values = torch.tensor(values, dtype=torch.float)
     if len(values) >= period:
-        moving_avg = values.unfold(dimension=0, size=period, step=1).mean(dim=1).flatten(start_dim=0)
+        moving_avg = values.unfold(dimension=0, size=period, step=1)             .mean(dim=1).flatten(start_dim=0)
         moving_avg = torch.cat((torch.zeros(period-1), moving_avg))
     else:
         moving_avg = torch.zeros(len(values))
@@ -406,7 +406,7 @@ class QValues():
         # on the "older" target_net; selecting their best reward with max(1)[0].
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        batch_size = len(next_states) # Since I didn't concatenate the states
+        batch_size = len(next_states) # len instead of .shape since I didn't concatenate the states
         values = torch.zeros(batch_size, device=QValues.device)
         action = policy_net(non_final_next_states).detach().argmax(dim=1).view(-1,1)
         values[non_final_mask] = target_net(non_final_next_states).detach().gather(1, action).view(-1)
@@ -443,12 +443,45 @@ agent        = Agent(strategy, em.n_actions, device)
 memory       = ReplayMemory(memory_size)
 state_holder = StateHolder()
 
-policy_net   = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
+
+# restore checkpoint
+checkp_number = 250
+
+filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + str(checkp_number) + ".pt")
+checkpoint = torch.load(filename_checkpoint)
+
+policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
+policy_net.load_state_dict(checkpoint["parameters"])
+
+optimizer = optim.Adam(params = policy_net.parameters(), lr = lr)
+optimizer.load_state_dict(checkpoint["optimizer"])
+
+episode_restart = checkpoint["episode"]
+tot_steps_done  = checkpoint["tot_steps_done"]
+
 target_net   = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()  # since we only use this net for inference
 
-optimizer = optim.Adam(params = policy_net.parameters(), lr = lr)
+
+print("Restart from episode:", episode_restart, "total steps done:", tot_steps_done)
+
+
+# restore arrays of durations, rewards and losses
+infile_durations = open(filename_durations, 'rb')
+episode_durations = pickle.load(infile_durations)
+infile_durations.close()
+
+infile_rewards = open(filename_rewards, 'rb')
+episode_rewards = pickle.load(infile_rewards)
+infile_rewards.close()
+
+infile_losses = open(filename_losses, 'rb')
+losses = pickle.load(infile_losses)
+infile_losses.close()
+
+
+print(len(episode_durations), len(episode_rewards), len(losses))
 
 
 # ### Training Loop
@@ -459,14 +492,9 @@ start = datetime.now()
 print("Starting date and time: ", start.strftime("%d/%m/%Y %H:%M:%S"))
 
 
-episode_durations = []
-episode_rewards = []
-losses = []
-tot_steps_done = 0
-
 policy_net.train()
 
-for episode in range(1, num_episodes + 1): # I prefer starting from 1
+for episode in range(episode_restart + 1, num_episodes + 1):
     em.reset()
     state_holder.push(em.get_state())
     episode_reward = 0
@@ -532,7 +560,7 @@ for episode in range(1, num_episodes + 1): # I prefer starting from 1
             del next_q_values
             del target_q_values
             del loss
-            
+
         if em.done:
             episode_durations.append(timestep)
             episode_rewards.append(episode_reward)
@@ -542,7 +570,7 @@ for episode in range(1, num_episodes + 1): # I prefer starting from 1
             
         if timestep > timestep_max:
             break
-
+            
     if episode % save_fig_step == 0:
         plot_durations(episode_durations, 100)
         plot_rewards(episode_rewards, 100)
