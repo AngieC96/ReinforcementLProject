@@ -5,6 +5,7 @@
 
 # ## Import Libraries
 
+# Commented out IPython magic to ensure Python compatibility.
 #get_ipython().run_line_magic('matplotlib', 'inline')
 import os                                      # to create folders
 import gym                                     # contains the game environment
@@ -26,7 +27,7 @@ import torchvision.transforms as T
 
 
 # Tracking version for saving weights
-version = "04"
+version = "02"
 
 
 # Creates the game environment
@@ -34,15 +35,6 @@ version = "04"
 #env = gym.make('Breakout-v0').unwrapped
 env = gym.make('BreakoutDeterministic-v4').unwrapped
 #env = gym.make('BreakoutNoFrameskip-v4').unwrapped
-
-
-# ## Set Up Device
-# 
-# We import IPython's display module to aid us in plotting images to the screen later.
-
-is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
 
 
 # ## Deep Q-Network
@@ -106,13 +98,12 @@ class DQN(nn.Module):
 
 folder_save = "models"
 os.makedirs(folder_save, exist_ok=True)
-folder_checkp = "checkpoints_" + version
-filename_checkp = os.path.join(folder_save, folder_checkp)
-os.makedirs(filename_checkp, exist_ok=True)
+folder_checkp = os.path.join(folder_save, "checkpoints_" + version)
+os.makedirs(folder_checkp, exist_ok=True)
 
-filename_durations = "durations.pickle"
-filename_rewards   = "rewards.pickle"
-filename_losses    = "losses.pickle"
+filename_durations = os.path.join(folder_checkp, "durations.pickle")
+filename_rewards   = os.path.join(folder_checkp, "rewards.pickle")
+filename_losses    = os.path.join(folder_checkp, "losses.pickle")
 
 def exchange_weights(net1, net2):
     net1.load_state_dict(net2.state_dict())
@@ -132,22 +123,19 @@ def save_checkpoint(net, optimizer, episode, tot_steps_done):
         "episode"       : episode,
         "tot_steps_done": tot_steps_done
     }
-    filename_checkp = os.path.join(filename_checkp, "checkpoint_" + str(n) +".pt")
-    torch.save(checkpoint_dict, filename)
+    filename_checkp = os.path.join(folder_checkp, "checkpoint_" + str(episode) +".pt")
+    torch.save(checkpoint_dict, filename_checkp)
     
 def save_vectors4plots(episode_durations, episode_rewards, losses):
     # save the vectors
-    filename_durations = os.path.join(filename_checkp, filename_durations)
     outfile = open(filename_durations, 'wb')
     pickle.dump(episode_durations, outfile)
     outfile.close()
     
-    filename_rewards = os.path.join(filename_checkp, filename_rewards)
     outfile = open(filename_rewards, 'wb')
     pickle.dump(episode_rewards, outfile)
     outfile.close()
     
-    filename_losses = os.path.join(filename_checkp, filename_losses)
     outfile = open(filename_losses, 'wb')
     pickle.dump(losses, outfile)
     outfile.close()
@@ -241,9 +229,8 @@ class Agent():
         self.num_actions  = num_actions # number of actions that can be taken from a given state
         self.device       = device
 
-    def select_action(self, state, policy_net):
-        rate = self.strategy.get_exploration_rate(self.current_step)
-        self.current_step += 1
+    def select_action(self, current_step, state, policy_net):
+        rate = self.strategy.get_exploration_rate(current_step)
 
         if rate > random.random() and state is not None:
             action = random.randrange(self.num_actions)
@@ -336,7 +323,7 @@ class EnvManager():
 folder_figs = "figures"
 os.makedirs(folder_figs, exist_ok=True)
 
-def plot_durations(values, moving_avg_period, episode):
+def plot_durations(values, moving_avg_period):
     plt.figure(1, figsize=(10,5))
     plt.clf()  # Clear the current figure.
     plt.xlabel('Episode', fontsize=14)
@@ -348,7 +335,7 @@ def plot_durations(values, moving_avg_period, episode):
     plt.savefig(filename)
     print("", moving_avg_period, "episode duration moving avg:", moving_avg[-1])
 
-def plot_rewards(values, moving_avg_period, episode):
+def plot_rewards(values, moving_avg_period):
     plt.figure(2, figsize=(10,5))
     plt.clf()
     plt.xlabel('Episode', fontsize=14)
@@ -369,7 +356,7 @@ def get_moving_average(period, values):
         moving_avg = torch.zeros(len(values))
     return moving_avg.numpy()
 
-def plot_loss(values, episode):
+def plot_loss(values):
     plt.figure(3, figsize=(10,5))
     plt.xlabel('Update', fontsize=14)
     plt.ylabel('Loss', fontsize=14)
@@ -552,20 +539,20 @@ for episode in range(1, num_episodes + 1): # I prefer starting from 1
             episode_rewards.append(episode_reward)
             print("Episode", episode)
             print("Total steps done", tot_steps_done)
-            if is_ipython: display.clear_output(wait=True)
             break
             
         if timestep > timestep_max:
             break
 
     if episode % save_fig_step == 0:
-        plot_durations(episode_durations, 100, episode)
-        plot_rewards(episode_rewards, 100, episode)
-        plot_loss(losses, episode)
+        plot_durations(episode_durations, 100)
+        plot_rewards(episode_rewards, 100)
+        plot_loss(losses)
 
     if episode % target_net_update == 0:
         exchange_weights(target_net, policy_net)
         save_checkpoint(episode, policy_net, optimizer, num_episodes, tot_steps_done)
+        save_vectors4plots(episode_durations, episode_rewards, losses)
 
 save_weights(policy_net, "CNN_" + version)
 em.close()

@@ -32,7 +32,7 @@ import torchvision.transforms as T
 
 
 # Tracking version for saving weights
-version = "03"
+version = "01"
 
 
 # In[3]:
@@ -124,13 +124,12 @@ class DQN(nn.Module):
 
 folder_save = "models"
 os.makedirs(folder_save, exist_ok=True)
-folder_checkp = "checkpoints_" + version
-filename_checkp = os.path.join(folder_save, folder_checkp)
-os.makedirs(filename_checkp, exist_ok=True)
+folder_checkp = os.path.join(folder_save, "checkpoints_" + version)
+os.makedirs(folder_checkp, exist_ok=True)
 
-filename_durations = "durations.pickle"
-filename_rewards   = "rewards.pickle"
-filename_losses    = "losses.pickle"
+filename_durations = os.path.join(folder_checkp, "durations.pickle")
+filename_rewards   = os.path.join(folder_checkp, "rewards.pickle")
+filename_losses    = os.path.join(folder_checkp, "losses.pickle")
 
 def exchange_weights(net1, net2):
     net1.load_state_dict(net2.state_dict())
@@ -150,22 +149,19 @@ def save_checkpoint(net, optimizer, episode, tot_steps_done):
         "episode"       : episode,
         "tot_steps_done": tot_steps_done
     }
-    filename_checkp = os.path.join(filename_checkp, "checkpoint_" + str(n) +".pt")
-    torch.save(checkpoint_dict, filename)
+    filename_checkp = os.path.join(folder_checkp, "checkpoint_" + str(episode) +".pt")
+    torch.save(checkpoint_dict, filename_checkp)
     
 def save_vectors4plots(episode_durations, episode_rewards, losses):
     # save the vectors
-    filename_durations = os.path.join(filename_checkp, filename_durations)
     outfile = open(filename_durations, 'wb')
     pickle.dump(episode_durations, outfile)
     outfile.close()
     
-    filename_rewards = os.path.join(filename_checkp, filename_rewards)
     outfile = open(filename_rewards, 'wb')
     pickle.dump(episode_rewards, outfile)
     outfile.close()
     
-    filename_losses = os.path.join(filename_checkp, filename_losses)
     outfile = open(filename_losses, 'wb')
     pickle.dump(losses, outfile)
     outfile.close()
@@ -418,7 +414,7 @@ plt.show()
 folder_figs = "figures"
 os.makedirs(folder_figs, exist_ok=True)
 
-def plot_durations(values, moving_avg_period, episode):
+def plot_durations(values, moving_avg_period):
     plt.figure(1, figsize=(10,5))
     plt.clf()  # Clear the current figure.
     plt.xlabel('Episode', fontsize=14)
@@ -430,7 +426,7 @@ def plot_durations(values, moving_avg_period, episode):
     plt.savefig(filename)
     print("", moving_avg_period, "episode duration moving avg:", moving_avg[-1])
 
-def plot_rewards(values, moving_avg_period, episode):
+def plot_rewards(values, moving_avg_period):
     plt.figure(2, figsize=(10,5))
     plt.clf()
     plt.xlabel('Episode', fontsize=14)
@@ -451,7 +447,7 @@ def get_moving_average(period, values):
         moving_avg = torch.zeros(len(values))
     return moving_avg.numpy()
 
-def plot_loss(values, episode):
+def plot_loss(values):
     plt.figure(3, figsize=(10,5))
     plt.xlabel('Update', fontsize=14)
     plt.ylabel('Loss', fontsize=14)
@@ -530,7 +526,7 @@ class QValues():
         # on the "older" target_net; selecting their best reward with max(1)[0].
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        batch_size = len(next_states) # Since I didn't concatenate the states
+        batch_size = len(next_states) # len instead of .shape since I didn't concatenate the states
         values = torch.zeros(batch_size, device=QValues.device)
         action = policy_net(non_final_next_states).detach().argmax(dim=1).view(-1,1)
         values[non_final_mask] = target_net(non_final_next_states).detach().gather(1, action).view(-1)
@@ -592,7 +588,7 @@ start = datetime.now()
 print("Starting date and time: ", start.strftime("%d/%m/%Y %H:%M:%S"))
 
 
-# In[24]:
+# In[ ]:
 
 
 episode_durations = []
@@ -611,7 +607,7 @@ for episode in range(1, num_episodes + 1): # I prefer starting from 1
     for timestep in count():
         # Transition handling code
         state  = state_holder.get()
-        action = agent.select_action(tot_steps_done,state, policy_net)
+        action = agent.select_action(tot_steps_done, state, policy_net)
         reward, info = em.take_action(action)
         episode_reward += reward
         life = info['ale.lives'] # or em.env.ale.lives()
@@ -681,9 +677,9 @@ for episode in range(1, num_episodes + 1): # I prefer starting from 1
             break
     
     if episode % save_fig_step == 0:
-        plot_durations(episode_durations, 100, episode)
-        plot_rewards(episode_rewards, 100, episode)
-        plot_loss(losses, episode)
+        plot_durations(episode_durations, 100)
+        plot_rewards(episode_rewards, 100)
+        plot_loss(losses)
 
     if episode % target_net_update == 0:
         exchange_weights(target_net, policy_net)
@@ -701,28 +697,4 @@ end = datetime.now()
 # format: dd/mm/YY H:M:S
 print(f"Finishing date and time: ", end.strftime("%d/%m/%Y %H:%M:%S"))
 print(f"Total time training: {end-start}")
-
-
-# Let's play an episode to see if it learned to play:
-
-# In[ ]:
-
-
-#policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
-#load_weights(policy_net, "CNN_" + version + ".pt")
-policy_net.eval()
-
-for episode in range(1):
-    em.reset()
-    state = em.get_state()
-    
-    for timestep in count():
-        em.render()
-        action = agent.select_action(state, policy_net)
-        reward = em.take_action(action)
-        state = em.get_state()
-        if em.done:
-            break
-        
-em.close()
 

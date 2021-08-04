@@ -114,7 +114,7 @@ class DQN(nn.Module):
 
 # ## StateHolder class
 
-# In[29]:
+# In[5]:
 
 
 class StateHolder:
@@ -148,7 +148,7 @@ class StateHolder:
 
 # ## Epsilon Greedy Strategy
 
-# In[5]:
+# In[6]:
 
 
 class EpsilonGreedyStrategy():
@@ -164,7 +164,7 @@ class EpsilonGreedyStrategy():
 
 # ## Reinforcement Learning Agent
 
-# In[6]:
+# In[7]:
 
 
 class Agent():
@@ -187,7 +187,7 @@ class Agent():
 
 # ## Environment Manager
 
-# In[7]:
+# In[8]:
 
 
 STATE_W = 84
@@ -268,7 +268,7 @@ class EnvManager():
 
 # ### Plotting
 
-# In[8]:
+# In[9]:
 
 
 folder_figs = "figures"
@@ -311,7 +311,7 @@ def get_moving_average(period, values):
         moving_avg = torch.zeros(len(values))
     return moving_avg.numpy()
 
-def plot_loss(values, steps):
+def plot_loss(values):
     plt.figure(3, figsize=(10,5))
     plt.xlabel('Update', fontsize=14)
     plt.ylabel('Loss', fontsize=14)
@@ -324,7 +324,7 @@ def plot_loss(values, steps):
 
 # ## Main Program
 
-# In[11]:
+# In[12]:
 
 
 # Hyperparameters
@@ -333,7 +333,7 @@ eps_end             = 0.1         # parameters for e-greedy strategy for action 
 eps_decay           = 0.0000001   #
 
 
-# In[31]:
+# In[13]:
 
 
 # Essential Objects
@@ -347,18 +347,17 @@ agent        = Agent(strategy, em.n_actions, device)
 state_holder = StateHolder()
 
 
-# In[16]:
+# In[19]:
 
 
 # restore checkpoint
-version = "03"
-checkp_number = 750
+version = "01"
+checkp_number = 500
 
 folder_save = "models"
-folder_checkp = "checkpoints_" + version
-filename_checkp = os.path.join(folder_save, folder_checkp)
+folder_checkp = os.path.join(folder_save, "checkpoints_" + version)
 
-filename_checkpoint = os.path.join(filename_checkp, "checkpoint_" + str(checkp_number) + ".pt")
+filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + str(checkp_number) + ".pt")
 checkpoint = torch.load(filename_checkpoint)
 
 policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
@@ -368,7 +367,7 @@ episode_train   = checkpoint["episode"]
 tot_steps_train = checkpoint["tot_steps_done"]
 
 
-# In[17]:
+# In[20]:
 
 
 print("Trained for", episode_train, "episodes. Total steps done:", tot_steps_train)
@@ -382,17 +381,17 @@ filename_rewards   = "rewards.pickle"
 filename_losses    = "losses.pickle"
 
 # restore arrays of durations, rewards and losses
-filename_durations = os.path.join(filename_checkp, filename_durations)
+filename_durations = os.path.join(folder_checkp, filename_durations)
 infile_durations = open(filename_durations, 'rb')
 episode_durations = pickle.load(infile_durations)
 infile_durations.close()
 
-filename_rewards = os.path.join(filename_checkp, filename_rewards)
+filename_rewards = os.path.join(folder_checkp, filename_rewards)
 infile_rewards = open(filename_rewards, 'rb')
 episode_rewards = pickle.load(infile_rewards)
 infile_rewards.close()
 
-filename_losses = os.path.join(filename_checkp, filename_losses)
+filename_losses = os.path.join(folder_checkp, filename_losses)
 infile_losses = open(filename_losses, 'rb')
 losses = pickle.load(infile_losses)
 infile_losses.close()
@@ -408,7 +407,7 @@ print(len(episode_durations), len(episode_rewards), len(losses))
 
 # Let's play an episode to see if it learned to play:
 
-# In[36]:
+# In[28]:
 
 
 policy_net.eval()

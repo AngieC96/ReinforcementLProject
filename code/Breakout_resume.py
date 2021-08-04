@@ -32,7 +32,7 @@ import torchvision.transforms as T
 
 
 # Tracking version for saving weights
-version = "03"
+version = "01"
 
 
 # In[3]:
@@ -124,13 +124,12 @@ class DQN(nn.Module):
 
 folder_save = "models"
 os.makedirs(folder_save, exist_ok=True)
-folder_checkp = "checkpoints_" + version
-filename_checkp = os.path.join(folder_save, folder_checkp)
-os.makedirs(filename_checkp, exist_ok=True)
+folder_checkp = os.path.join(folder_save, "checkpoints_" + version)
+os.makedirs(folder_checkp, exist_ok=True)
 
-filename_durations = "durations.pickle"
-filename_rewards   = "rewards.pickle"
-filename_losses    = "losses.pickle"
+filename_durations = os.path.join(folder_checkp, "durations.pickle")
+filename_rewards   = os.path.join(folder_checkp, "rewards.pickle")
+filename_losses    = os.path.join(folder_checkp, "losses.pickle")
 
 def exchange_weights(net1, net2):
     net1.load_state_dict(net2.state_dict())
@@ -150,22 +149,19 @@ def save_checkpoint(net, optimizer, episode, tot_steps_done):
         "episode"       : episode,
         "tot_steps_done": tot_steps_done
     }
-    filename_checkp = os.path.join(filename_checkp, "checkpoint_" + str(episode) +".pt")
-    torch.save(checkpoint_dict, filename)
+    filename_checkp = os.path.join(folder_checkp, "checkpoint_" + str(episode) +".pt")
+    torch.save(checkpoint_dict, filename_checkp)
     
 def save_vectors4plots(episode_durations, episode_rewards, losses):
     # save the vectors
-    filename_durations = os.path.join(filename_checkp, filename_durations)
     outfile = open(filename_durations, 'wb')
     pickle.dump(episode_durations, outfile)
     outfile.close()
     
-    episode_rewards = os.path.join(filename_checkp, episode_rewards)
     outfile = open(filename_rewards, 'wb')
     pickle.dump(episode_rewards, outfile)
     outfile.close()
     
-    filename_losses = os.path.join(filename_checkp, filename_losses)
     outfile = open(filename_losses, 'wb')
     pickle.dump(losses, outfile)
     outfile.close()
@@ -374,13 +370,13 @@ class EnvManager():
 
 # ### Plotting
 
-# In[16]:
+# In[14]:
 
 
 folder_figs = "figures"
 os.makedirs(folder_figs, exist_ok=True)
 
-def plot_durations(values, moving_avg_period, episode):
+def plot_durations(values, moving_avg_period):
     plt.figure(1, figsize=(10,5))
     plt.clf()  # Clear the current figure.
     plt.xlabel('Episode', fontsize=14)
@@ -390,11 +386,9 @@ def plot_durations(values, moving_avg_period, episode):
     plt.plot(moving_avg)
     filename = os.path.join(folder_figs, "durations_" + version + ".png")
     plt.savefig(filename)
-    plt.show()
-    print("Episode", episode + len(values), "\n",         moving_avg_period, "episode duration moving avg:", moving_avg[-1])
-    #if is_ipython: display.clear_output(wait=True)
+    print("", moving_avg_period, "episode duration moving avg:", moving_avg[-1])
 
-def plot_rewards(values, moving_avg_period, episode):
+def plot_rewards(values, moving_avg_period):
     plt.figure(2, figsize=(10,5))
     plt.clf()
     plt.xlabel('Episode', fontsize=14)
@@ -404,9 +398,7 @@ def plot_rewards(values, moving_avg_period, episode):
     plt.plot(moving_avg)
     filename = os.path.join(folder_figs, "rewards_" + version + ".png")
     plt.savefig(filename)
-    plt.show()
-    print("Episode", episode + len(values), "\n",         moving_avg_period, "episode reward moving avg:", moving_avg[-1])
-    #if is_ipython: display.clear_output(wait=True)
+    print("", moving_avg_period, "episode reward moving avg:", moving_avg[-1])
 
 def get_moving_average(period, values):
     values = torch.tensor(values, dtype=torch.float)
@@ -417,20 +409,18 @@ def get_moving_average(period, values):
         moving_avg = torch.zeros(len(values))
     return moving_avg.numpy()
 
-def plot_loss(values, steps):
+def plot_loss(values):
     plt.figure(3, figsize=(10,5))
     plt.xlabel('Update', fontsize=14)
     plt.ylabel('Loss', fontsize=14)
     plt.plot(values)
     filename = os.path.join(folder_figs, "loss_" + version + ".png")
     plt.savefig(filename)
-    plt.show()
-    if is_ipython: display.clear_output(wait=True)
 
 
 # ### Tensor Processing
 
-# In[17]:
+# In[15]:
 
 
 def extract_tensors(experiences):
@@ -449,7 +439,7 @@ def extract_tensors(experiences):
 
 # ## Q-Value Calculator
 
-# In[20]:
+# In[16]:
 
 
 class QValues():
@@ -476,7 +466,7 @@ class QValues():
         # on the "older" target_net; selecting their best reward with max(1)[0].
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        batch_size = len(next_states) # Since I didn't concatenate the states
+        batch_size = len(next_states) # len instead of .shape since I didn't concatenate the states
         values = torch.zeros(batch_size, device=QValues.device)
         action = policy_net(non_final_next_states).detach().argmax(dim=1).view(-1,1)
         values[non_final_mask] = target_net(non_final_next_states).detach().gather(1, action).view(-1)
@@ -485,7 +475,7 @@ class QValues():
 
 # ## Main Program
 
-# In[21]:
+# In[17]:
 
 
 # Hyperparameters
@@ -504,7 +494,7 @@ timestep_max        = 18_000      # Number of timesteps after which we end an ep
 save_fig_step       = 200
 
 
-# In[22]:
+# In[18]:
 
 
 # Essential Objects
@@ -520,15 +510,13 @@ memory       = ReplayMemory(memory_size)
 state_holder = StateHolder()
 
 
-# In[23]:
+# In[19]:
 
 
 # restore checkpoint
-checkp_number = 450
+checkp_number = 250
 
-filename_checkp = os.path.join(folder_save, folder_checkp)
-
-filename_checkpoint = os.path.join(filename_checkp, "checkpoint_" + str(checkp_number) + ".pt")
+filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + str(checkp_number) + ".pt")
 checkpoint = torch.load(filename_checkpoint)
 
 policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
@@ -545,39 +533,30 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()  # since we only use this net for inference
 
 
-# In[24]:
+# In[20]:
 
 
 print("Restart from episode:", episode_restart, "total steps done:", tot_steps_done)
 
 
-# In[25]:
-
-
-episode_restart = checkp_number
-
-
-# In[26]:
+# In[24]:
 
 
 # restore arrays of durations, rewards and losses
-filename_durations = os.path.join(filename_checkp, filename_durations)
 infile_durations = open(filename_durations, 'rb')
 episode_durations = pickle.load(infile_durations)
 infile_durations.close()
 
-filename_rewards = os.path.join(filename_checkp, filename_rewards)
 infile_rewards = open(filename_rewards, 'rb')
 episode_rewards = pickle.load(infile_rewards)
 infile_rewards.close()
 
-filename_losses = os.path.join(filename_checkp, filename_losses)
 infile_losses = open(filename_losses, 'rb')
 losses = pickle.load(infile_losses)
 infile_losses.close()
 
 
-# In[27]:
+# In[25]:
 
 
 print(len(episode_durations), len(episode_rewards), len(losses))
@@ -585,7 +564,7 @@ print(len(episode_durations), len(episode_rewards), len(losses))
 
 # ### Training Loop
 
-# In[28]:
+# In[26]:
 
 
 # datetime object containing current date and time
@@ -678,9 +657,9 @@ for episode in range(episode_restart + 1, num_episodes + 1):
             break
             
     if episode % save_fig_step == 0:
-        plot_durations(episode_durations, 100, episode)
-        plot_rewards(episode_rewards, 100, episode)
-        plot_loss(losses, tot_steps_done)
+        plot_durations(episode_durations, 100)
+        plot_rewards(episode_rewards, 100)
+        plot_loss(losses)
 
     if episode % target_net_update == 0:
         exchange_weights(target_net, policy_net)
@@ -698,26 +677,4 @@ end = datetime.now()
 # format: dd/mm/YY H:M:S
 print(f"Finishing date and time: ", end.strftime("%d/%m/%Y %H:%M:%S"))
 print(f"Total time training: {end-start}")
-
-
-# Let's play an episode to see if it learned to play:
-
-# In[ ]:
-
-
-policy_net.eval()
-
-for episode in range(1):
-    em.reset()
-    state = em.get_state()
-    
-    for timestep in count():
-        em.render()
-        action = agent.select_action(state, policy_net)
-        reward = em.take_action(action)
-        state = em.get_state()
-        if em.done:
-            break
-        
-em.close()
 
