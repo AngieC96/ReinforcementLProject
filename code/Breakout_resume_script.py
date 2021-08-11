@@ -444,10 +444,17 @@ memory       = ReplayMemory(memory_size)
 state_holder = StateHolder()
 
 
-# restore checkpoint
-checkp_number = 14500
+def find_last_checkpoint_number():
+    files = os.listdir(folder_checkp)
+    paths = [os.path.join(folder_checkp, basename) for basename in files if basename.endswith('.pt')]
+    return max(paths, key=os.path.getctime)[33:].split(".")[0]
 
-filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + str(checkp_number) + ".pt")
+# restore checkpoint
+checkp_number = find_last_checkpoint_number()
+
+print("Last checkpoint number:", checkp_number)
+
+filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + checkp_number + ".pt")
 checkpoint = torch.load(filename_checkpoint)
 
 policy_net = DQN(em.get_screen_height(), em.get_screen_width(), em.n_actions).to(device)
