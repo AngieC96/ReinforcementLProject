@@ -5,18 +5,18 @@
 Repository for the project of the course "Reinforcement Learning" of the master degree "Data Science and Scientific Computing" @Units
 
 
+## About the project
+
+The aim of the project is to teach a computer agent to play the Atari 2600 game Breakout via the Reinforcement Learning technique of Double (Deep) Q-Learning.
+    
+We will use images of the screen game to make our agent learn a policy that can allow it to score a sufficient number of points in the game (how many depends on the computing power and the time at your disposal).
+
+
+You can find the slides for the presentation [here](slides/Reinforcement_Learning_Project.pdf).
 
 
 
-
-
-
-
-
-
-
-
-
+## Info
 
 To kill the annoying windows, open a terminal and digit:
 
