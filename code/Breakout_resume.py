@@ -514,7 +514,7 @@ state_holder = StateHolder()
 
 
 # restore checkpoint
-checkp_number = 250
+checkp_number = 3000
 
 filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + str(checkp_number) + ".pt")
 checkpoint = torch.load(filename_checkpoint)
@@ -539,7 +539,7 @@ target_net.eval()  # since we only use this net for inference
 print("Restart from episode:", episode_restart, "total steps done:", tot_steps_done)
 
 
-# In[24]:
+# In[21]:
 
 
 # restore arrays of durations, rewards and losses
@@ -556,7 +556,7 @@ losses = pickle.load(infile_losses)
 infile_losses.close()
 
 
-# In[25]:
+# In[22]:
 
 
 print(len(episode_durations), len(episode_rewards), len(losses))
@@ -564,7 +564,7 @@ print(len(episode_durations), len(episode_rewards), len(losses))
 
 # ### Training Loop
 
-# In[26]:
+# In[23]:
 
 
 # datetime object containing current date and time
@@ -648,9 +648,9 @@ for episode in range(episode_restart + 1, num_episodes + 1):
         if em.done:
             episode_durations.append(timestep)
             episode_rewards.append(episode_reward)
-            print("Episode", episode)
-            print("Total steps done", tot_steps_done)
-            if is_ipython: display.clear_output(wait=True)
+            #print("Episode", episode)
+            #print("Total steps done", tot_steps_done)
+            #if is_ipython: display.clear_output(wait=True)
             break
             
         if timestep > timestep_max:
@@ -665,6 +665,8 @@ for episode in range(episode_restart + 1, num_episodes + 1):
         exchange_weights(target_net, policy_net)
         save_checkpoint(policy_net, optimizer, episode, tot_steps_done)
         save_vectors4plots(episode_durations, episode_rewards, losses)
+        print("Saved checkpoint", episode)
+        if is_ipython: display.clear_output(wait=True)
 
 save_weights(policy_net, "CNN_" + version)
 em.close()

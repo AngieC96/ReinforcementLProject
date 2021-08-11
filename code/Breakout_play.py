@@ -264,67 +264,9 @@ class EnvManager():
         return resize(screen).mul(255).type(torch.ByteTensor).to(device).detach().unsqueeze(0) # add a batch dimension (BCHW)
 
 
-# ## Utility Functions
-
-# ### Plotting
-
-# In[9]:
-
-
-folder_figs = "figures"
-os.makedirs(folder_figs, exist_ok=True)
-
-def plot_durations(values, moving_avg_period, episode):
-    plt.figure(1, figsize=(10,5))
-    plt.clf()  # Clear the current figure.
-    plt.xlabel('Episode', fontsize=14)
-    plt.ylabel('Duration', fontsize=14)
-    plt.plot(values)
-    moving_avg = get_moving_average(moving_avg_period, values)
-    plt.plot(moving_avg)
-    filename = os.path.join(folder_figs, "durations_" + version + ".png")
-    plt.savefig(filename)
-    plt.show()
-    print("Episode", episode + len(values), "\n",         moving_avg_period, "episode duration moving avg:", moving_avg[-1])
-    #if is_ipython: display.clear_output(wait=True)
-
-def plot_rewards(values, moving_avg_period, episode):
-    plt.figure(2, figsize=(10,5))
-    plt.clf()
-    plt.xlabel('Episode', fontsize=14)
-    plt.ylabel('Reward', fontsize=14)
-    plt.plot(values)
-    moving_avg = get_moving_average(moving_avg_period, values)
-    plt.plot(moving_avg)
-    filename = os.path.join(folder_figs, "rewards_" + version + ".png")
-    plt.savefig(filename)
-    plt.show()
-    print("Episode", episode + len(values), "\n",         moving_avg_period, "episode reward moving avg:", moving_avg[-1])
-    #if is_ipython: display.clear_output(wait=True)
-
-def get_moving_average(period, values):
-    values = torch.tensor(values, dtype=torch.float)
-    if len(values) >= period:
-        moving_avg = values.unfold(dimension=0, size=period, step=1)             .mean(dim=1).flatten(start_dim=0)
-        moving_avg = torch.cat((torch.zeros(period-1), moving_avg))
-    else:
-        moving_avg = torch.zeros(len(values))
-    return moving_avg.numpy()
-
-def plot_loss(values):
-    plt.figure(3, figsize=(10,5))
-    plt.xlabel('Update', fontsize=14)
-    plt.ylabel('Loss', fontsize=14)
-    plt.plot(values)
-    filename = os.path.join(folder_figs, "loss_" + version + ".png")
-    plt.savefig(filename)
-    plt.show()
-    if is_ipython: display.clear_output(wait=True)
-
-
 # ## Main Program
 
-# In[12]:
+# In[10]:
 
 
 # Hyperparameters
@@ -333,7 +275,7 @@ eps_end             = 0.1         # parameters for e-greedy strategy for action 
 eps_decay           = 0.0000001   #
 
 
-# In[13]:
+# In[11]:
 
 
 # Essential Objects
@@ -347,12 +289,12 @@ agent        = Agent(strategy, em.n_actions, device)
 state_holder = StateHolder()
 
 
-# In[19]:
+# In[12]:
 
 
 # restore checkpoint
-version = "01"
-checkp_number = 500
+version = "02"
+checkp_number = 28200
 
 folder_save = "models"
 folder_checkp = os.path.join(folder_save, "checkpoints_" + version)
@@ -367,13 +309,13 @@ episode_train   = checkpoint["episode"]
 tot_steps_train = checkpoint["tot_steps_done"]
 
 
-# In[20]:
+# In[13]:
 
 
 print("Trained for", episode_train, "episodes. Total steps done:", tot_steps_train)
 
 
-# In[21]:
+# In[14]:
 
 
 filename_durations = "durations.pickle"
@@ -397,7 +339,7 @@ losses = pickle.load(infile_losses)
 infile_losses.close()
 
 
-# In[22]:
+# In[15]:
 
 
 print(len(episode_durations), len(episode_rewards), len(losses))
@@ -407,7 +349,7 @@ print(len(episode_durations), len(episode_rewards), len(losses))
 
 # Let's play an episode to see if it learned to play:
 
-# In[28]:
+# In[23]:
 
 
 policy_net.eval()
