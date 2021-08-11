@@ -425,7 +425,7 @@ optimize_model_step = 4           # Number of frames after which we train the mo
 target_net_update   = 50          # Number of episodes after which we update the target model
 memory_size         = 200_000
 lr                  = 0.00001
-num_episodes        = 15_000
+num_episodes        = 50_000
 timestep_max        = 18_000      # Number of timesteps after which we end an episode
 
 save_fig_step       = 200
@@ -445,7 +445,7 @@ state_holder = StateHolder()
 
 
 # restore checkpoint
-checkp_number = 250
+checkp_number = 14500
 
 filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + str(checkp_number) + ".pt")
 checkpoint = torch.load(filename_checkpoint)
@@ -476,9 +476,12 @@ infile_rewards = open(filename_rewards, 'rb')
 episode_rewards = pickle.load(infile_rewards)
 infile_rewards.close()
 
-infile_losses = open(filename_losses, 'rb')
-losses = pickle.load(infile_losses)
-infile_losses.close()
+try:
+    infile_losses = open(filename_losses, 'rb')
+    losses = pickle.load(infile_losses)
+    infile_losses.close()
+except EOFError:  # If the file is empty the EndOfFileError is raised
+    losses = []
 
 
 print(len(episode_durations), len(episode_rewards), len(losses))
@@ -564,8 +567,8 @@ for episode in range(episode_restart + 1, num_episodes + 1):
         if em.done:
             episode_durations.append(timestep)
             episode_rewards.append(episode_reward)
-            print("Episode", episode)
-            print("Total steps done", tot_steps_done)
+            #print("Episode", episode)
+            #print("Total steps done", tot_steps_done)
             break
             
         if timestep > timestep_max:
@@ -580,6 +583,7 @@ for episode in range(episode_restart + 1, num_episodes + 1):
         exchange_weights(target_net, policy_net)
         save_checkpoint(policy_net, optimizer, episode, tot_steps_done)
         save_vectors4plots(episode_durations, episode_rewards, losses)
+        print("Saved checkpoint", episode)
 
 save_weights(policy_net, "CNN_" + version)
 em.close()
