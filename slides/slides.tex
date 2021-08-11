@@ -265,103 +265,10 @@
     
 \end{frame}
 
-\begin{frame}{The frameskip}
-
-    Is it that we take every four consecutive frames? NOPE. It turns out that there’s a frame skipping parameter, which confusingly enough, the DeepMind folks also set at 4. What this means in practice is that only every fourth screenshot is considered, and then we form the “phi”s, which are the “consecutive” frames that together become the input to the neural network function approximator. Consider the updated sequence of screenshots, with the skipped frames denoted with an “X” over them:
-    
-    FIGURE
-    
-    What ends up happening is that the states are four consecutive frames, ignoring all of the “X”-ed out screenshots. In the above image, there are only seven non-skipped frames. Let’s denote these as x1,x2,…,x7. The DQN algorithm will use s1=(x1,x2,x3,x4) as one state. Then for the next state, it uses s2=(x2,x3,x4,x5). And so on.
-
-    Crucially, the states are overlapping.
-    
-    A remark before we move on: one might be worried that the agent is throwing away a lot of information using the above procedure. In fact, it actually makes a lot of sense to do this. Seeing four consecutive frames without subsampling doesn’t give enough information to discern motion that well, especially after the downsampling process.
-    
-\end{frame}
-
-\begin{frame}{Frame Title}
-
-    Breakout does not have a specified reward threshold at which it's considered solved.
-
-    We have a policy network and a target network, so to be more stable...
-    
-    time decreasing $\varepsilon$-greedy (balance explor exploit)
-    
-\end{frame}
-
 
 {\putbg
 \section{The Journey of Learning} % The Learning Process
 }
-
-\begin{frame}{}
-
-    The first trial with a feedforward network
-    
-    % 01: 'Breakout-v0'
-
-\end{frame}
-
-
-\begin{frame}{}
-
-    The first trial with a convolutional network
-
-\end{frame}
-
-
-{\putbgdark
-\begin{frame}[standout]
-	\begin{center}
-		\Large \uncover<+->{\alert{12 hours of training...}}
-		
-		\Huge\uncover<+->{..and it didn't learn anything!}
-	\end{center}
-\end{frame}
-}
-\stepcounter{framenumber}
-
-
-\begin{frame}{}
-
-    Then I understood that the Atari game is \alert{not deterministic} in principle, if you want it to be you have to put \textsc{NoFrameskip-v4}.
-    
-    As per our experiments, a fixed frame technique does not inject stochasticity but clearly simplifies the learning problem and speeds up convergence (see the scores below). \href{https://towardsdatascience.com/are-the-space-invaders-deterministic-or-stochastic-595a30becae2}{link}\\
-    Therefore, my preference when training on Open AI GYM would go toward using {}deterministic-v0 where we have a good stochasticity and no time distortion.
-    
-    % 02: 'BreakoutNoFrameskip-v4'
-    
-\end{frame}
-
-
-\begin{frame}{Frame Title}
-
-    Another improvement: stacking frames.
-    
-    With three frames stacked we can derive both the direction, velocity and acceleration of the moving ball, but as not every game is rendered at the same pace, we'll keep 4 frames - just to be sure that we have all necessary information.
-    
-\end{frame}
-
-
-\begin{frame}{Problems}
-
-    Looking around I've seen that it takes around $5000$ episodes or $1000000$ time steps to start learning something, which means to start getting a reward of around $10$.
-    
-    The cluster and the notebooks all run out of memory. The only one that survives a bit is Google Colab, but after $5$ hours you finish the available runtime so the kernel is disconnected, and since (I really don't know why) it doesn't save the checkpoints I cannot continue the training.
-
-\end{frame}
-
-
-{\putbgdark
-\begin{frame}[standout]
-	\begin{center}
-        But it kept crashing.
-    
-        It turns out, that you don't want to plot three figures every episode if you're already using a lot of memory.
-	\end{center}
-\end{frame}
-}
-\stepcounter{framenumber}
 
 
 \begin{frame}{Improvements}
@@ -403,7 +310,5 @@
 	\end{center}
 \end{frame}
 }
-
-
 
 \end{document}
