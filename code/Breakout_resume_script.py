@@ -422,13 +422,13 @@ eps_start           = 1           #
 eps_end             = 0.1         # parameters for e-greedy strategy for action selection
 eps_decay           = 0.0000001   #
 optimize_model_step = 4           # Number of frames after which we train the model 
-target_net_update   = 50          # Number of episodes after which we update the target model
 memory_size         = 200_000
 lr                  = 0.00001
-num_episodes        = 50_000
+num_episodes        = 100_000
 timestep_max        = 18_000      # Number of timesteps after which we end an episode
 
-save_fig_step       = 200
+target_net_update   = 200          # Number of episodes after which we update the target model
+save_fig_step       = 200          # Number of episodes after which we save the figures
 
 
 # Essential Objects
@@ -451,7 +451,6 @@ def find_last_checkpoint_number():
 
 # restore checkpoint
 checkp_number = find_last_checkpoint_number()
-
 print("Last checkpoint number:", checkp_number)
 
 filename_checkpoint = os.path.join(folder_checkp, "checkpoint_" + checkp_number + ".pt")
@@ -590,7 +589,7 @@ for episode in range(episode_restart + 1, num_episodes + 1):
         exchange_weights(target_net, policy_net)
         save_checkpoint(policy_net, optimizer, episode, tot_steps_done)
         save_vectors4plots(episode_durations, episode_rewards, losses)
-        print("Saved checkpoint", episode)
+        #print("Saved checkpoint", episode)
 
 save_weights(policy_net, "CNN_" + version)
 em.close()
