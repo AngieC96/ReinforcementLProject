@@ -266,7 +266,7 @@ class EnvManager():
 
 # ## Main Program
 
-# In[10]:
+# In[9]:
 
 
 # Hyperparameters
@@ -275,7 +275,7 @@ eps_end             = 0.1         # parameters for e-greedy strategy for action 
 eps_decay           = 0.0000001   #
 
 
-# In[11]:
+# In[10]:
 
 
 # Essential Objects
@@ -289,12 +289,12 @@ agent        = Agent(strategy, em.n_actions, device)
 state_holder = StateHolder()
 
 
-# In[12]:
+# In[11]:
 
 
 # restore checkpoint
 version = "02"
-checkp_number = 28200
+checkp_number = 39600
 
 folder_save = "models"
 folder_checkp = os.path.join(folder_save, "checkpoints_" + version)
@@ -309,47 +309,17 @@ episode_train   = checkpoint["episode"]
 tot_steps_train = checkpoint["tot_steps_done"]
 
 
-# In[13]:
+# In[12]:
 
 
 print("Trained for", episode_train, "episodes. Total steps done:", tot_steps_train)
-
-
-# In[14]:
-
-
-filename_durations = "durations.pickle"
-filename_rewards   = "rewards.pickle"
-filename_losses    = "losses.pickle"
-
-# restore arrays of durations, rewards and losses
-filename_durations = os.path.join(folder_checkp, filename_durations)
-infile_durations = open(filename_durations, 'rb')
-episode_durations = pickle.load(infile_durations)
-infile_durations.close()
-
-filename_rewards = os.path.join(folder_checkp, filename_rewards)
-infile_rewards = open(filename_rewards, 'rb')
-episode_rewards = pickle.load(infile_rewards)
-infile_rewards.close()
-
-filename_losses = os.path.join(folder_checkp, filename_losses)
-infile_losses = open(filename_losses, 'rb')
-losses = pickle.load(infile_losses)
-infile_losses.close()
-
-
-# In[15]:
-
-
-print(len(episode_durations), len(episode_rewards), len(losses))
 
 
 # ### Play an episode
 
 # Let's play an episode to see if it learned to play:
 
-# In[23]:
+# In[14]:
 
 
 policy_net.eval()
