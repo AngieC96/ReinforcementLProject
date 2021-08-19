@@ -427,7 +427,7 @@ lr                  = 0.00001
 num_episodes        = 100_000
 timestep_max        = 18_000      # Number of timesteps after which we end an episode
 
-target_net_update   = 200          # Number of episodes after which we update the target model
+target_net_update   = 50           # Number of episodes after which we update the target model
 save_fig_step       = 200          # Number of episodes after which we save the figures
 
 
