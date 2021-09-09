@@ -16,9 +16,23 @@ You can find the slides for the presentation [here](slides/Reinforcement_Learnin
 
 
 
+## The code
+
+The notebooks files all have a corresponding `.py` file for the versioning (otherwise in the `.ipynb` files it's impossible to see the changes through git). They are made or by downloading the notebook as a `.py` file or through the Jupyter plugin `jupytext`, that reads and writes notebooks as plain text files: either Python, Julia, R scripts, Markdown, or R Markdown documents.
+
+- The notebook [Breakout_intro.ipynb](code/Breakout_intro.ipynb) is used to understand the environment of the Breakout game.
+- The notebook [Breakout.ipynb](code/Breakout.ipynb) is used to train the agent, and saves at specific checkpoints the weights of the neural networks and the statistics of the game (episode duration, rewards, loss).
+- The notebook [Breakout_resume.ipynb](code/Breakout_resume.ipynb) is used to resume the training of the agent in case it stops (I noticed that it usually uses up all the available memory and it crashes). It uses automatically the last saved checkpoint and saves new ones.
+- The notebook [Breakout_play.ipynb](code/Breakout_play.ipynb) is used to play a game with the agent. Depending on how much you want your agent to be trained, you can use different checkpoint weights.
+- The file [Breakout_script.py](code/Breakout_script.py) is a cleaned version of the notebook [Breakout.ipynb](code/Breakout.ipynb) to be used in a cluster. It can be submitted as a job in the cluster using the script [script_cluster.sh](code/script_cluster.sh).
+
+- The file [Breakout_resume_script.py](code/Breakout_resume_script.py) is a cleaned version of the notebook [Breakout_resume.ipynb](code/Breakout_resume.ipynb) to be used in a cluster. It can be submitted as a job in the cluster using the script [script_cluster_resume.sh](code/script_cluster_resume.sh).
+
+
+
 ## Info
 
-To kill the annoying windows, open a terminal and digit:
+To kill the annoying windows of the environment rendering that don't close, open a terminal and digit:
 
 ```bash
 xkill
@@ -130,7 +144,7 @@ pip install gym[atari]
 
 #### ROMs
 
-In order to import ROMS, you need to download `Roms.rar` from the [Atari 2600 VCS ROM Collection](http://www.atarimania.com/rom_collection_archive_atari_2600_roms.html) and extract the `.rar` file.
+In order to import ROMS, you need to download `Roms.rar` from the [Atari 2600 VCS ROM Collection](http://www.atarimania.com/rom_collection_archive_atari_2600_roms.html) and extract the `.rar` file. Save this file in a folder called `ROMs`.
 
 To do so, open a terminal and install `unrar`:
 
@@ -144,9 +158,7 @@ Then to extract the file run:
 unrar e -r Roms.rar
 ```
 
-You'll get two `zip` files: `ROMS.zip` and `HC ROMS.zip`. Using the archive manager, unzip both files.
-
-Put every ROM-related file in a folder called `ROMs`.
+You'll get two `zip` files: `ROMS.zip` and `HC ROMS.zip`. Using the archive manager, unzip both files in the current directory.
 
 Once you've done all that, run:
 
@@ -161,3 +173,18 @@ python -m atari_py.import_roms ~/Documenti/Reinforcement\ Learning/Project/code/
 ```
 
 This should print out the names of ROMs as it imports them. The ROMs will be copied to your `atari_py` installation directory (in my case: `/home/angela/Documenti/Reinforcement Learning/Project/code/venv/lib/python3.6/site-packages/atari_py/atari_roms/`).
+
+##### Breakout's ROM
+
+If you only want to use the game Breakout, you can only keep one ROM in the folder `ROMs`:
+
+```dockerfile
+Breakout - Breakaway IV (Paddle) (1978) (Atari, Brad Stewart - Sears) (CX2622 - 6-99813, 49-75107) ~.bin
+```
+
+and delete the other files. Then opening a terminal in that folder run
+
+```bash
+python -m atari_py.import_roms ./ROMs
+```
+
